@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ import {
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
 
-export default function NewClientPage() {
+function NewClientContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -231,10 +231,10 @@ export default function NewClientPage() {
               <div className="space-y-2">
                 <Label htmlFor="source">Source</Label>
                 <Select name="source" defaultValue={prospect?.source ?? undefined}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-200">
                     <SelectValue placeholder="Comment avez-vous trouvé ce client ?" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
                     {CLIENT_SOURCES.map((source) => (
                       <SelectItem key={source} value={source}>
                         {source}
@@ -249,10 +249,10 @@ export default function NewClientPage() {
               <div className="space-y-2">
                 <Label htmlFor="status">Statut</Label>
                 <Select name="status" defaultValue={prospect?.status ?? "prospect"}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-200">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
                     {(
                       Object.keys(CLIENT_STATUS_CONFIG) as ClientStatus[]
                     ).map((status) => (
@@ -316,5 +316,17 @@ export default function NewClientPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function NewClientPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-teal-500" />
+      </div>
+    }>
+      <NewClientContent />
+    </Suspense>
   );
 }
