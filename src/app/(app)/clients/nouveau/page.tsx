@@ -98,16 +98,42 @@ export default function NewClientPage() {
 
     if (!error && resultId) {
       const isStillProspect = clientData.status === "prospect";
+      const isWon = clientData.status === "gagne";
+
       await supabase.from("activity_log").insert({
         user_id: user?.id,
         action: prospectId
           ? isStillProspect
             ? `Prospect mis à jour : ${clientData.first_name} ${clientData.last_name}`
-            : `Prospect converti en client : ${clientData.first_name} ${clientData.last_name}`
+            : isWon
+              ? `Prospect gagné et converti en client : ${clientData.first_name} ${clientData.last_name}`
+              : `Prospect mis à jour : ${clientData.first_name} ${clientData.last_name}`
           : `Nouveau client ajouté : ${clientData.first_name} ${clientData.last_name}`,
         entity_type: "client",
         entity_id: resultId,
       });
+
+      // Automatiquement créer un projet si le statut est "Gagné"
+      if (isWon) {
+        // Vérifier si un projet n'existe pas déjà pour ce client pour éviter les doublons
+        const { data: existingProject } = await supabase
+          .from("projects")
+          .select("id")
+          .eq("client_id", resultId)
+          .maybeSingle();
+
+        if (!existingProject) {
+          await supabase.from("projects").insert({
+            name: `Projet - ${clientData.company || clientData.last_name}`,
+            client_id: resultId,
+            status: "en_attente",
+            budget: clientData.estimated_amount,
+            github_url: clientData.github_url,
+            created_by: user?.id,
+            description: clientData.notes
+          });
+        }
+      }
 
       // Redirect based on final status
       if (prospectId && clientData.status === "prospect") {

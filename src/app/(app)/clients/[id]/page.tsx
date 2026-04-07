@@ -81,12 +81,38 @@ export default function ClientEditPage() {
       .eq("id", params.id);
 
     if (!error) {
+      const isWon = updates.status === "gagne";
+
       await supabase.from("activity_log").insert({
         user_id: user?.id,
-        action: `Client ${updates.first_name} ${updates.last_name} modifié`,
+        action: isWon 
+          ? `Client ${updates.first_name} ${updates.last_name} gagné ! 🎉`
+          : `Client ${updates.first_name} ${updates.last_name} modifié`,
         entity_type: "client",
         entity_id: params.id,
       });
+
+      // Automatiquement créer un projet si le statut est "Gagné"
+      if (isWon) {
+        // Vérifier si un projet n'existe pas déjà pour ce client
+        const { data: existingProject } = await supabase
+          .from("projects")
+          .select("id")
+          .eq("client_id", params.id)
+          .maybeSingle();
+
+        if (!existingProject) {
+          await supabase.from("projects").insert({
+            name: `Projet - ${updates.company || updates.last_name}`,
+            client_id: params.id,
+            status: "en_attente",
+            budget: updates.estimated_amount,
+            github_url: updates.github_url,
+            created_by: user?.id,
+            description: updates.notes
+          });
+        }
+      }
 
       router.push("/clients");
       router.refresh();
@@ -173,7 +199,6 @@ export default function ClientEditPage() {
                   name="first_name"
                   placeholder="Jean"
                   defaultValue={client.first_name}
-                  required
                 />
               </div>
               <div className="space-y-2">

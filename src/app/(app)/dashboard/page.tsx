@@ -49,6 +49,10 @@ export default async function DashboardPage() {
   const totalPipeline = clients
     .filter((c) => !["gagne", "perdu"].includes(c.status))
     .reduce((sum: number, c: { estimated_amount: number }) => sum + (c.estimated_amount || 0), 0);
+  const wonCount = clients.filter((c) => c.status === "gagne").length;
+  const lostCount = clients.filter((c) => c.status === "perdu").length;
+  const totalClosed = wonCount + lostCount;
+  const conversionRate = totalClosed > 0 ? (wonCount / totalClosed) * 100 : 0;
   const wonAmount = clients
     .filter((c) => c.status === "gagne")
     .reduce((sum: number, c: { estimated_amount: number }) => sum + (c.estimated_amount || 0), 0);
@@ -100,13 +104,13 @@ export default async function DashboardPage() {
         <Card className="border-slate-700 bg-slate-800/60 backdrop-blur-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-slate-400">
-              Pipeline en cours
+              Taux de conversion
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-blue-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {formatCurrency(totalPipeline)}
+            <div className="text-2xl font-bold text-white whitespace-nowrap">
+              {conversionRate > 0 ? `${conversionRate.toFixed(1)}%` : "0% Keep Pushing"}
             </div>
           </CardContent>
         </Card>
@@ -124,45 +128,61 @@ export default async function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Pipeline Breakdown */}
-        <Card className="lg:col-span-2 border-slate-700 bg-slate-800/60">
-          <CardHeader>
-            <CardTitle className="text-white">Pipeline commercial</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {statusCounts.map((s) => (
-                <div key={s.status} className="flex items-center gap-3">
-                  <Badge
-                    variant="secondary"
-                    className={`${s.bgColor} ${s.color} min-w-[110px] justify-center border-0`}
-                  >
-                    {s.label}
-                  </Badge>
-                  <div className="flex-1">
-                    <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-500"
-                        style={{
-                          width: `${totalClients > 0 ? (s.count / totalClients) * 100 : 0}%`,
-                        }}
-                      />
+      </div>      <div className="grid gap-6 lg:grid-cols-3 items-start">
+        {/* Left Column: Pipeline + Buttons */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="border-slate-700 bg-slate-800/60 min-h-[300px] flex flex-col">
+            <CardHeader>
+              <CardTitle className="text-white">Pipeline commercial</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col justify-center">
+              <div className="space-y-3">
+                {statusCounts.map((s) => (
+                  <div key={s.status} className="flex items-center gap-3">
+                    <Badge
+                      variant="secondary"
+                      className={`${s.bgColor} ${s.color} min-w-[110px] justify-center border-0`}
+                    >
+                      {s.label}
+                    </Badge>
+                    <div className="flex-1">
+                      <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-500"
+                          style={{
+                            width: `${totalClients > 0 ? (s.count / totalClients) * 100 : 0}%`,
+                          }}
+                        />
+                      </div>
                     </div>
+                    <span className="min-w-[30px] text-right text-sm font-medium text-slate-300">
+                      {s.count}
+                    </span>
                   </div>
-                  <span className="min-w-[30px] text-right text-sm font-medium text-slate-300">
-                    {s.count}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Recent Activity */}
-        <Card className="border-slate-700 bg-slate-800/60">
+          {/* Quick Links move here */}
+          <div className="flex gap-3">
+            <Link
+              href="/clients/nouveau"
+              className="inline-flex items-center rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all"
+            >
+              + Nouveau client
+            </Link>
+            <Link
+              href="/clients"
+              className="inline-flex items-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
+            >
+              Voir tous les clients
+            </Link>
+          </div>
+        </div>
+
+        {/* Right Column: Recent Activity */}
+        <Card className="border-slate-700 bg-slate-800/60 min-h-[300px]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
               <Clock className="h-4 w-4 text-teal-400" />
@@ -192,22 +212,6 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
-      </div>
-
-      {/* Quick Links */}
-      <div className="flex gap-3">
-        <Link
-          href="/clients/nouveau"
-          className="inline-flex items-center rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500 px-4 py-2 text-sm font-medium text-white hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all"
-        >
-          + Nouveau client
-        </Link>
-        <Link
-          href="/clients"
-          className="inline-flex items-center rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800 transition-colors"
-        >
-          Voir tous les clients
-        </Link>
       </div>
     </div>
   );

@@ -49,8 +49,9 @@ export default async function ClientsPage({ searchParams }: PageProps) {
   }
 
   if (params.search) {
+    const search = `%${params.search}%`;
     query = query.or(
-      `first_name.ilike.%${params.search}%,last_name.ilike.%${params.search}%,company.ilike.%${params.search}%,email.ilike.%${params.search}%`
+      `first_name.ilike.${search},last_name.ilike.${search},company.ilike.${search},email.ilike.${search},phone.ilike.${search},source.ilike.${search},notes.ilike.${search}`
     );
   }
 

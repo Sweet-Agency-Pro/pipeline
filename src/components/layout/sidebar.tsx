@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -147,8 +148,15 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex h-14 items-center border-b border-slate-700 px-6">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-500 text-white font-bold text-sm shadow-lg shadow-teal-500/20">
-              S
+            <div className="relative h-8 w-8">
+              <Image
+                src="/sweet_logo.png"
+                alt="Sweet Agency Logo"
+                fill
+                sizes="32px"
+                className="rounded-lg object-contain"
+                priority
+              />
             </div>
             <span className="font-semibold text-lg text-white">Pipeline</span>
           </Link>

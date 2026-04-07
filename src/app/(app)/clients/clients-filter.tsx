@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -34,6 +34,7 @@ export function ClientsFilter({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -42,7 +43,8 @@ export function ClientsFilter({
     } else {
       params.delete(key);
     }
-    router.push(`/clients?${params.toString()}`);
+    const path = (pathname as string) || "/clients";
+    router.push(`${path}?${params.toString()}`);
   }
 
   return (
@@ -53,40 +55,46 @@ export function ClientsFilter({
           placeholder="Rechercher un client..."
           defaultValue={currentSearch}
           onChange={(e) => {
+            const val = e.target.value;
             const timeout = setTimeout(() => {
-              updateFilter("search", e.target.value);
+              updateFilter("search", val);
             }, 300);
             return () => clearTimeout(timeout);
           }}
-          className="pl-9"
+          className="pl-9 bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-500"
         />
       </div>
+
       <Select
-        defaultValue={currentStatus || "all"}
-        onValueChange={(value) => updateFilter("status", value)}
+        value={currentStatus || "all"}
+        onValueChange={(value) => updateFilter("status", value || "all")}
       >
-        <SelectTrigger className="w-full sm:w-[180px]">
-          <SelectValue placeholder="Tous les statuts" />
+        <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200">
+          <SelectValue>
+            {currentStatus === "all" || !currentStatus ? "Tous les statuts" : 
+             CLIENT_STATUS_CONFIG[currentStatus as ClientStatus]?.label || "Tous les statuts"}
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
           <SelectItem value="all">Tous les statuts</SelectItem>
-          {(Object.keys(CLIENT_STATUS_CONFIG) as ClientStatus[]).map(
-            (status) => (
-              <SelectItem key={status} value={status}>
-                {CLIENT_STATUS_CONFIG[status].label}
-              </SelectItem>
-            )
-          )}
+          {(Object.keys(CLIENT_STATUS_CONFIG) as ClientStatus[]).map((status) => (
+            <SelectItem key={status} value={status}>
+              {CLIENT_STATUS_CONFIG[status].label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
+
       <Select
-        defaultValue={currentSource || "all"}
-        onValueChange={(value) => updateFilter("source", value)}
+        value={currentSource || "all"}
+        onValueChange={(value) => updateFilter("source", value || "all")}
       >
-        <SelectTrigger className="w-full sm:w-[180px]">
-          <SelectValue placeholder="Toutes les sources" />
+        <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200">
+          <SelectValue>
+            {currentSource === "all" || !currentSource ? "Toutes les sources" : currentSource}
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
           <SelectItem value="all">Toutes les sources</SelectItem>
           {CLIENT_SOURCES.map((source) => (
             <SelectItem key={source} value={source}>
@@ -95,14 +103,17 @@ export function ClientsFilter({
           ))}
         </SelectContent>
       </Select>
+
       <Select
-        defaultValue={currentSort || "created_at:desc"}
-        onValueChange={(value) => updateFilter("sort", value)}
+        value={currentSort || "created_at:desc"}
+        onValueChange={(value) => updateFilter("sort", value || "created_at:desc")}
       >
-        <SelectTrigger className="w-full sm:w-[170px]">
-          <SelectValue placeholder="Trier par" />
+        <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200">
+          <SelectValue>
+            {SORT_OPTIONS.find(opt => opt.value === (currentSort || "created_at:desc"))?.label || "Trier par"}
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
           {SORT_OPTIONS.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}

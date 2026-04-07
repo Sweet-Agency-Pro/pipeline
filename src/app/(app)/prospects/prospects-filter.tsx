@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -32,6 +32,7 @@ export function ProspectsFilter({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -40,7 +41,8 @@ export function ProspectsFilter({
     } else {
       params.delete(key);
     }
-    router.push(`/prospects?${params.toString()}`);
+    const path = pathname || "/prospects";
+    router.push(`${path}?${params.toString()}`);
   }
 
   return (
@@ -51,22 +53,26 @@ export function ProspectsFilter({
           placeholder="Rechercher un prospect..."
           defaultValue={currentSearch}
           onChange={(e) => {
+            const val = e.target.value;
             const timeout = setTimeout(() => {
-              updateFilter("search", e.target.value);
+              updateFilter("search", val);
             }, 300);
             return () => clearTimeout(timeout);
           }}
-          className="pl-9"
+          className="pl-9 bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-500"
         />
       </div>
+
       <Select
-        defaultValue={currentSource || "all"}
-        onValueChange={(value) => updateFilter("source", value)}
+        value={currentSource || "all"}
+        onValueChange={(value) => updateFilter("source", value || "all")}
       >
-        <SelectTrigger className="w-full sm:w-[180px]">
-          <SelectValue placeholder="Toutes les sources" />
+        <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200">
+          <SelectValue>
+            {currentSource === "all" || !currentSource ? "Toutes les sources" : currentSource}
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
           <SelectItem value="all">Toutes les sources</SelectItem>
           {CLIENT_SOURCES.map((source) => (
             <SelectItem key={source} value={source}>
@@ -75,14 +81,17 @@ export function ProspectsFilter({
           ))}
         </SelectContent>
       </Select>
+
       <Select
-        defaultValue={currentSort || "created_at:desc"}
-        onValueChange={(value) => updateFilter("sort", value)}
+        value={currentSort || "created_at:desc"}
+        onValueChange={(value) => updateFilter("sort", value || "created_at:desc")}
       >
-        <SelectTrigger className="w-full sm:w-[170px]">
-          <SelectValue placeholder="Trier par" />
+        <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200">
+          <SelectValue>
+            {SORT_OPTIONS.find(opt => opt.value === (currentSort || "created_at:desc"))?.label || "Trier par"}
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-slate-900 border-slate-700 text-slate-200">
           {SORT_OPTIONS.map((opt) => (
             <SelectItem key={opt.value} value={opt.value}>
               {opt.label}

@@ -65,3 +65,7 @@ body {
   background: #475569;
 }
 
+/* Fix for layout shift from Radix UI */
+.scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+}

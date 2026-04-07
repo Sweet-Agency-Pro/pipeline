@@ -7,7 +7,14 @@ export type ClientStatus =
   | "gagne"
   | "perdu";
 
-export type ProjectStatus = "en_cours" | "termine" | "en_pause" | "annule";
+export type ProjectStatus =
+  | "en_attente"
+  | "en_cours"
+  | "pas_de_retours"
+  | "termine"
+  | "en_pause"
+  | "annule"
+  | "archive";
 
 export type UserRole = "admin" | "user";
 
@@ -116,10 +123,20 @@ export const PROJECT_STATUS_CONFIG: Record<
   ProjectStatus,
   { label: string; color: string; bgColor: string }
 > = {
+  en_attente: {
+    label: "En attente",
+    color: "text-slate-400",
+    bgColor: "bg-slate-500/15",
+  },
   en_cours: {
     label: "En cours",
     color: "text-cyan-400",
     bgColor: "bg-cyan-500/15",
+  },
+  pas_de_retours: {
+    label: "Pas de retours",
+    color: "text-rose-400",
+    bgColor: "bg-rose-500/15",
   },
   termine: {
     label: "Terminé",
@@ -135,6 +152,11 @@ export const PROJECT_STATUS_CONFIG: Record<
     label: "Annulé",
     color: "text-red-400",
     bgColor: "bg-red-500/15",
+  },
+  archive: {
+    label: "Archivé",
+    color: "text-slate-500",
+    bgColor: "bg-slate-700/15",
   },
 };
 

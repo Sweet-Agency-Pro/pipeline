@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Pipeline — Agence Sweet",
   description: "Outil de suivi commercial — Agence Sweet",
+  icons: {
+    icon: "/sweet_logo.webp",
+  },
 };
 
 export default function RootLayout({
