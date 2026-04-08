@@ -54,11 +54,15 @@ export function ActivityFilter({
         />
       </div>
       <Select
-        defaultValue={currentEntityType || "all"}
+        value={currentEntityType || "all"}
         onValueChange={(value: string | null) => updateFilter("entity_type", value ?? "all")}
       >
         <SelectTrigger className="w-full sm:w-[200px]">
-          <SelectValue placeholder="Tous les types" />
+          <SelectValue>
+            {!currentEntityType || currentEntityType === "all"
+              ? "Tous les types"
+              : ENTITY_TYPES.find((t) => t.value === currentEntityType)?.label || "Tous les types"}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tous les types</SelectItem>
