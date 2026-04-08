@@ -65,7 +65,7 @@ export function ProspectsFilter({
 
       <Select
         value={currentSource || "all"}
-        onValueChange={(value) => updateFilter("source", value || "all")}
+        onValueChange={(value: string | null) => updateFilter("source", value ?? "all")}
       >
         <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200">
           <SelectValue>
@@ -84,7 +84,7 @@ export function ProspectsFilter({
 
       <Select
         value={currentSort || "created_at:desc"}
-        onValueChange={(value) => updateFilter("sort", value || "created_at:desc")}
+        onValueChange={(value: string | null) => updateFilter("sort", value ?? "created_at:desc")}
       >
         <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200">
           <SelectValue>

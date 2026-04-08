@@ -19,6 +19,7 @@ import {
   Users,
   FolderKanban,
   UserSearch,
+  Activity,
   LogOut,
   Menu,
   X,
@@ -32,6 +33,7 @@ const navigation = [
   { name: "Prospects", href: "/prospects", icon: UserSearch },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Projets", href: "/projets", icon: FolderKanban },
+  { name: "Activité", href: "/activite", icon: Activity },
 ];
 
 export function Sidebar() {
