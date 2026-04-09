@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleAuth } from "google-auth-library";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
 function getGoogleAuth() {
@@ -30,6 +32,8 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json();
   const { calendarId, title, start, end, location, description } = body;
+
+  console.log(`📝 POST event: calendar=${calendarId}, title=${title}`);
 
   if (!calendarId || !title || !start || !end) {
     return NextResponse.json(

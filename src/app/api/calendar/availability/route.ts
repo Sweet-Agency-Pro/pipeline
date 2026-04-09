@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleAuth } from "google-auth-library";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
 function getCalendarIds(): string[] {
@@ -61,6 +63,8 @@ export async function GET(request: NextRequest) {
       { id: string; title: string; start: string; end: string; location: string | null; allDay: boolean }[]
     > = {};
 
+    console.log(`📅 Calendriers configurés: ${calendarIds.join(", ")}`);
+
     await Promise.all(
       calendarIds.map(async (calId) => {
         try {
@@ -73,7 +77,7 @@ export async function GET(request: NextRequest) {
           });
           const res = await fetch(
             `${CALENDAR_API}/calendars/${encodeURIComponent(calId)}/events?${params}`,
-            { headers: { Authorization: `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
           );
           if (!res.ok) {
             const errBody = await res.text();

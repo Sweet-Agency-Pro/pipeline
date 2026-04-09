@@ -78,6 +78,7 @@ export function NouveauRdvDialog({
     title: "",
     client_id: "",
     assigned_to: profiles[0]?.id || "",
+    google_calendar: calendarIds[0] || "",
     start_time: "",
     end_time: "",
     location: DEFAULT_LOCATION,
@@ -91,6 +92,7 @@ export function NouveauRdvDialog({
         title: "",
         client_id: defaultClientId || "",
         assigned_to: profiles[0]?.id || "",
+        google_calendar: calendarIds[0] || "",
         start_time: defaults.start,
         end_time: defaults.end,
         location: DEFAULT_LOCATION,
@@ -213,10 +215,10 @@ export function NouveauRdvDialog({
       created_by: user?.id,
     });
 
-    // Push to the assigned profile's Google Calendar
+    // Push to the selected Google Calendar
     if (!error) {
       const assignedProfile = profiles.find((p) => p.id === form.assigned_to);
-      const calendarId = calendarIds.find((cid) => assignedProfile?.email && cid.toLowerCase() === assignedProfile.email.toLowerCase());
+      const calendarId = form.google_calendar;
       if (calendarId) {
         try {
           await fetch("/api/calendar/events", {
@@ -328,7 +330,7 @@ export function NouveauRdvDialog({
               </div>
             </div>
 
-            {/* Assigné + Client */}
+            {/* Assigné + Calendrier Google */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-medium text-slate-400">Assigné à *</Label>
@@ -346,20 +348,39 @@ export function NouveauRdvDialog({
                 </select>
               </div>
               <div>
-                <Label className="text-xs font-medium text-slate-400">Client</Label>
+                <Label className="text-xs font-medium text-slate-400">Calendrier Google *</Label>
                 <select
-                  value={form.client_id}
-                  onChange={(e) => update("client_id", e.target.value)}
+                  required
+                  value={form.google_calendar}
+                  onChange={(e) => update("google_calendar", e.target.value)}
                   className={`mt-1.5 ${selectClass}`}
                 >
-                  <option value="">— Aucun —</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
+                  {calendarIds.map((cid) => (
+                    <option key={cid} value={cid}>
+                      {cid.includes("@group.calendar.google.com")
+                        ? "Agence Sweet"
+                        : cid.split("@")[0]}
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
+
+            {/* Client */}
+            <div>
+              <Label className="text-xs font-medium text-slate-400">Client</Label>
+              <select
+                value={form.client_id}
+                onChange={(e) => update("client_id", e.target.value)}
+                className={`mt-1.5 ${selectClass}`}
+              >
+                <option value="">— Aucun —</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Email client */}

@@ -258,7 +258,7 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
             {uniqueCalIds.map((id) => (
               <div key={id} className="flex items-center gap-1.5">
                 <div className={cn("h-2 w-2 rounded-full", calColors[id].dot)} />
-                <span>{id.split("@")[0]}</span>
+                <span>{id.includes("@group.calendar.google.com") ? "Agence Sweet" : id.split("@")[0]}</span>
               </div>
             ))}
             <div className="flex items-center gap-1.5">
