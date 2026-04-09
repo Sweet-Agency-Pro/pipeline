@@ -76,10 +76,12 @@ export async function GET(request: NextRequest) {
             { headers: { Authorization: `Bearer ${token}` } }
           );
           if (!res.ok) {
-            console.warn(`Calendrier ${calId}: ${res.status} ${res.statusText}`);
+            const errBody = await res.text();
+            console.warn(`❌ Calendrier ${calId}: ${res.status} ${res.statusText}`, errBody);
             return;
           }
           const data = await res.json();
+          console.log(`✅ Calendrier ${calId}: ${(data.items || []).length} événement(s) trouvé(s)`);
           events[calId] = (data.items || []).map(
             (event: { id?: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; location?: string }) => {
               const allDay = !event.start?.dateTime;
