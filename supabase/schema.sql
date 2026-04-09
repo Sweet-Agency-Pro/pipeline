@@ -197,6 +197,57 @@ create trigger profiles_updated_at
   for each row execute procedure public.update_updated_at();
 
 -- ============================================
+-- RENDEZ-VOUS (calendar meetings)
+-- ============================================
+create type rdv_status as enum (
+  'planifie',
+  'confirme',
+  'annule',
+  'termine'
+);
+
+create table public.rendez_vous (
+  id uuid default uuid_generate_v4() primary key,
+  title text not null,
+  client_id uuid references public.clients(id) on delete set null,
+  assigned_to uuid references public.profiles(id) not null,
+  start_time timestamptz not null,
+  end_time timestamptz not null,
+  location text,
+  description text,
+  status rdv_status default 'planifie',
+  created_by uuid references public.profiles(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table public.rendez_vous enable row level security;
+
+create policy "RDV are viewable by authenticated users"
+  on public.rendez_vous for select
+  to authenticated
+  using (true);
+
+create policy "Authenticated users can insert RDV"
+  on public.rendez_vous for insert
+  to authenticated
+  with check (true);
+
+create policy "Authenticated users can update RDV"
+  on public.rendez_vous for update
+  to authenticated
+  using (true);
+
+create policy "Authenticated users can delete RDV"
+  on public.rendez_vous for delete
+  to authenticated
+  using (true);
+
+create trigger rendez_vous_updated_at
+  before update on public.rendez_vous
+  for each row execute procedure public.update_updated_at();
+
+-- ============================================
 -- INDEXES
 -- ============================================
 create index idx_clients_status on public.clients(status);
@@ -205,3 +256,6 @@ create index idx_projects_client_id on public.projects(client_id);
 create index idx_projects_status on public.projects(status);
 create index idx_activity_log_entity on public.activity_log(entity_type, entity_id);
 create index idx_activity_log_created_at on public.activity_log(created_at desc);
+create index idx_rdv_assigned_to on public.rendez_vous(assigned_to);
+create index idx_rdv_start_time on public.rendez_vous(start_time);
+create index idx_rdv_client_id on public.rendez_vous(client_id);

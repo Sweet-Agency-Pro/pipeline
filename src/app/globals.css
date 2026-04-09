@@ -65,6 +65,15 @@ body {
   background: #475569;
 }
 
+/* Hide scrollbar but keep scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Fix for layout shift from Radix UI */
 .scrollbar-gutter-stable {
   scrollbar-gutter: stable;

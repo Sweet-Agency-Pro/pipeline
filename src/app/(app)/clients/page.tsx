@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, ExternalLink, Mail, Phone } from "lucide-react";
+import { Plus, ExternalLink, Mail, Phone, CalendarPlus } from "lucide-react";
 import {
   CLIENT_STATUS_CONFIG,
   type Client,
@@ -10,6 +10,7 @@ import {
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ClientsFilter } from "./clients-filter";
 import { ResizableTable } from "../prospects/resizable-table";
+import { PlanifierRdvButton } from "@/components/planifier-rdv-button";
 
 export const dynamic = "force-dynamic";
 
@@ -92,12 +93,13 @@ export default async function ClientsPage({ searchParams }: PageProps) {
             { key: "amount", label: "Montant estimé", defaultWidth: 130, minWidth: 80, className: "text-right" },
             { key: "date", label: "Dernier contact", defaultWidth: 120, minWidth: 80 },
             { key: "esquisse", label: "Esquisse", defaultWidth: 90, minWidth: 60 },
+            { key: "rdv", label: "RDV", defaultWidth: 110, minWidth: 80 },
           ]}
         >
           {(!clients || clients.length === 0) ? (
             <tr>
               <td
-                colSpan={8}
+                colSpan={9}
                 className="h-24 text-center text-muted-foreground"
               >
                 Aucun client trouvé
@@ -171,6 +173,15 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
+                  </td>
+                  <td className="px-2 py-3 relative z-10">
+                    <PlanifierRdvButton
+                      clientId={client.id}
+                      clientLabel={displayName(client)}
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-teal-400 hover:text-teal-300 hover:bg-teal-500/10"
+                    />
                   </td>
                 </tr>
               );

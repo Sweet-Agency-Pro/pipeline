@@ -18,6 +18,8 @@ export type ProjectStatus =
 
 export type UserRole = "admin" | "user";
 
+export type RdvStatus = "planifie" | "confirme" | "annule" | "termine";
+
 export interface Profile {
   id: string;
   full_name: string | null;
@@ -75,6 +77,43 @@ export interface ActivityLog {
   created_at: string;
   // Joined fields
   profile?: Profile;
+}
+
+export interface RendezVous {
+  id: string;
+  title: string;
+  client_id: string | null;
+  assigned_to: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  description: string | null;
+  status: RdvStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  // Joined fields
+  client?: Client;
+  assigned_profile?: Profile;
+}
+
+export interface BusySlot {
+  start: string;
+  end: string;
+}
+
+export interface GoogleCalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  location: string | null;
+  allDay: boolean;
+  calendarId: string;
+}
+
+export interface CalendarAvailability {
+  [calendarId: string]: BusySlot[];
 }
 
 // Status display helpers
@@ -169,3 +208,29 @@ export const CLIENT_SOURCES = [
   "Publicité",
   "Autre",
 ];
+
+export const RDV_STATUS_CONFIG: Record<
+  RdvStatus,
+  { label: string; color: string; bgColor: string }
+> = {
+  planifie: {
+    label: "Planifié",
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/15",
+  },
+  confirme: {
+    label: "Confirmé",
+    color: "text-teal-400",
+    bgColor: "bg-teal-500/15",
+  },
+  annule: {
+    label: "Annulé",
+    color: "text-red-400",
+    bgColor: "bg-red-500/15",
+  },
+  termine: {
+    label: "Terminé",
+    color: "text-slate-400",
+    bgColor: "bg-slate-500/15",
+  },
+};

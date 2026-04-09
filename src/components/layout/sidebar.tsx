@@ -20,6 +20,7 @@ import {
   FolderKanban,
   UserSearch,
   Activity,
+  CalendarDays,
   LogOut,
   Menu,
   X,
@@ -33,6 +34,7 @@ const navigation = [
   { name: "Prospects", href: "/prospects", icon: UserSearch },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Projets", href: "/projets", icon: FolderKanban },
+  { name: "Calendrier", href: "/calendrier", icon: CalendarDays },
   { name: "Activité", href: "/activite", icon: Activity },
 ];
 

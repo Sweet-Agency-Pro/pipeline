@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,12 @@ import {
   CLIENT_SOURCES,
   type ClientStatus,
   type Client,
+  type Profile,
 } from "@/types";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, CalendarPlus } from "lucide-react";
 import Link from "next/link";
+import { PlanifierRdvButton } from "@/components/planifier-rdv-button";
+import { NouveauRdvDialog } from "@/app/(app)/calendrier/nouveau-rdv-dialog";
 
 function NewClientContent() {
   const router = useRouter();
@@ -35,7 +38,35 @@ function NewClientContent() {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [prospect, setProspect] = useState<Client | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<ClientStatus>("prospect");
   const prospectId = searchParams.get("from_prospect");
+
+  // RDV dialog after creation
+  const wantsRdv = useRef(false);
+  const [savedClient, setSavedClient] = useState<{ id: string; label: string } | null>(null);
+  const [rdvDialogOpen, setRdvDialogOpen] = useState(false);
+  const [rdvProfiles, setRdvProfiles] = useState<Profile[]>([]);
+  const [rdvClients, setRdvClients] = useState<{ id: string; label: string }[]>([]);
+  const [rdvCalendarIds, setRdvCalendarIds] = useState<string[]>([]);
+  const rdvDataLoaded = useRef(false);
+
+  const loadRdvData = useCallback(async () => {
+    if (rdvDataLoaded.current) return;
+    const [profilesRes, clientsRes, configRes] = await Promise.all([
+      supabase.from("profiles").select("*").order("full_name"),
+      supabase.from("clients").select("id, first_name, last_name, company").neq("status", "perdu").order("last_name"),
+      fetch("/api/calendar/config").then((r) => r.json()),
+    ]);
+    setRdvProfiles((profilesRes.data as Profile[]) || []);
+    setRdvClients(
+      clientsRes.data?.map((c: { id: string; first_name: string; last_name: string; company?: string }) => ({
+        id: c.id,
+        label: `${c.first_name} ${c.last_name}${c.company ? ` (${c.company})` : ""}`,
+      })) || []
+    );
+    setRdvCalendarIds(configRes.calendarIds || []);
+    rdvDataLoaded.current = true;
+  }, [supabase]);
 
   useEffect(() => {
     if (!prospectId) return;
@@ -45,7 +76,10 @@ function NewClientContent() {
         .select("*")
         .eq("id", prospectId!)
         .single();
-      if (data) setProspect(data);
+      if (data) {
+        setProspect(data);
+        setCurrentStatus(data.status);
+      }
     }
     loadProspect();
   }, [prospectId, supabase]);
@@ -135,6 +169,17 @@ function NewClientContent() {
         }
       }
 
+      // If user wanted to schedule RDV, open dialog instead of redirecting
+      if (wantsRdv.current && resultId) {
+        const label = `${clientData.first_name} ${clientData.last_name}${clientData.company ? ` (${clientData.company})` : ""}`;
+        setSavedClient({ id: resultId, label });
+        await loadRdvData();
+        setRdvDialogOpen(true);
+        setLoading(false);
+        wantsRdv.current = false;
+        return;
+      }
+
       // Redirect based on final status
       if (prospectId && clientData.status === "prospect") {
         router.push("/prospects");
@@ -165,6 +210,17 @@ function NewClientContent() {
               : "Ajoutez un nouveau prospect ou client"}
           </p>
         </div>
+        {prospectId && (
+          <PlanifierRdvButton
+            clientId={prospectId}
+            clientLabel={prospect ? `${prospect.first_name} ${prospect.last_name}${prospect.company ? ` (${prospect.company})` : ""}` : ""}
+            className={currentStatus === "prospect"
+              ? "border-slate-700 text-slate-500 cursor-not-allowed opacity-50"
+              : "border-teal-500/30 text-teal-400 hover:bg-teal-500/10 hover:text-teal-300"
+            }
+            disabled={currentStatus === "prospect"}
+          />
+        )}
       </div>
 
       <Card className="border-slate-700 bg-slate-800/60">
@@ -248,7 +304,7 @@ function NewClientContent() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="status">Statut</Label>
-                <Select name="status" defaultValue={prospect?.status ?? "prospect"}>
+                <Select name="status" value={currentStatus} onValueChange={(v) => setCurrentStatus(v as ClientStatus)}>
                   <SelectTrigger className="bg-slate-800/50 border-slate-700 text-slate-200">
                     <SelectValue />
                   </SelectTrigger>
@@ -306,6 +362,16 @@ function NewClientContent() {
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {prospectId ? "Enregistrer" : "Ajouter le client"}
               </Button>
+              <Button
+                type="submit"
+                variant="outline"
+                className="border-teal-500/30 text-teal-400 hover:bg-teal-500/10 hover:text-teal-300"
+                disabled={loading}
+                onClick={() => { wantsRdv.current = true; }}
+              >
+                <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
+                {prospectId ? "Enregistrer et planifier un RDV" : "Créer et planifier un RDV"}
+              </Button>
               <Link href={prospectId ? "/prospects" : "/clients"}>
                 <Button variant="outline" type="button" className="border-slate-700 text-slate-300 hover:bg-slate-700">
                   Annuler
@@ -315,6 +381,34 @@ function NewClientContent() {
           </form>
         </CardContent>
       </Card>
+
+      {savedClient && rdvDataLoaded.current && (
+        <NouveauRdvDialog
+          open={rdvDialogOpen}
+          onClose={() => {
+            setRdvDialogOpen(false);
+            if (prospectId && currentStatus === "prospect") {
+              router.push("/prospects");
+            } else {
+              router.push("/clients");
+            }
+            router.refresh();
+          }}
+          onCreated={() => {
+            setRdvDialogOpen(false);
+            if (prospectId && currentStatus === "prospect") {
+              router.push("/prospects");
+            } else {
+              router.push("/clients");
+            }
+            router.refresh();
+          }}
+          profiles={rdvProfiles}
+          clients={rdvClients}
+          calendarIds={rdvCalendarIds}
+          defaultClientId={savedClient.id}
+        />
+      )}
     </div>
   );
 }

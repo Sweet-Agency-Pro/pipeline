@@ -28,6 +28,7 @@ import {
   type Client,
 } from "@/types";
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
+import { PlanifierRdvButton } from "@/components/planifier-rdv-button";
 
 export default function ClientEditPage() {
   const router = useRouter();
@@ -174,6 +175,11 @@ export default function ClientEditPage() {
             Modifiez les informations du client
           </p>
         </div>
+        <PlanifierRdvButton
+          clientId={client.id}
+          clientLabel={`${client.first_name} ${client.last_name}${client.company ? ` (${client.company})` : ""}`}
+          className="border-teal-500/30 text-teal-400 hover:bg-teal-500/10 hover:text-teal-300"
+        />
         <Button
           variant="outline"
           size="sm"
