@@ -503,9 +503,12 @@ export function NouveauRdvDialog({
       const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
 
       // Call GCal API for each selected calendar
+      let savedEventId: string | null = null;
+      let savedCalId: string | null = null;
+
       await Promise.all(form.google_calendar.map(async (calendarId) => {
         try {
-          await fetch("/api/calendar/events", {
+          const gRes = await fetch("/api/calendar/events", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -517,10 +520,39 @@ export function NouveauRdvDialog({
               description: form.description || undefined,
             }),
           });
+          if (gRes.ok) {
+            const data = await gRes.json();
+            if (!savedEventId) {
+              savedEventId = data.eventId;
+              savedCalId = calendarId;
+            }
+          }
         } catch {
           // Individual push failed
         }
       }));
+
+      // Update the RDV with the first GCal ID for future sync
+      if (savedEventId) {
+        // Fetch the ID of the inserted RDV by the current user
+        const { data: latest } = await supabase
+          .from("rendez_vous")
+          .select("id")
+          .eq("created_by", user?.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+        
+        if (latest) {
+          await supabase
+            .from("rendez_vous")
+            .update({ 
+              google_event_id: savedEventId,
+              google_calendar_id: savedCalId 
+            })
+            .eq("id", latest.id);
+        }
+      }
 
       // Save email to client if it was manually entered
       const emailToUse = clientEmail.trim();

@@ -50,6 +50,31 @@ export function RdvDetailDialog({
   async function updateStatus(status: RdvStatus) {
     setLoading(true);
     await supabase.from("rendez_vous").update({ status }).eq("id", rdv.id);
+
+    // Sync with Google Calendar if possible
+    if (rdv.google_event_id && rdv.google_calendar_id) {
+      const colorIds = {
+        planifie: "1", // Light Blue
+        confirme: "10", // Green
+        annule: "11",    // Red
+        termine: "8",   // Grey
+      };
+
+      try {
+        await fetch("/api/calendar/events", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            calendarId: rdv.google_calendar_id,
+            eventId: rdv.google_event_id,
+            colorId: colorIds[status] || "10",
+          }),
+        });
+      } catch (err) {
+        console.error("GCal sync failed:", err);
+      }
+    }
+
     setLoading(false);
     onUpdated();
   }
@@ -58,12 +83,25 @@ export function RdvDetailDialog({
     if (!confirm("Supprimer ce rendez-vous ?")) return;
     setLoading(true);
     try {
-      await fetch("/api/calendar/events", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: rdv.title, start: rdv.start_time }),
-      });
-    } catch {}
+      if (rdv.google_event_id && rdv.google_calendar_id) {
+        // Precise delete
+        await fetch("/api/calendar/events", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            calendarId: rdv.google_calendar_id,
+            eventId: rdv.google_event_id
+          }),
+        });
+      } else {
+        // Fallback fuzzy delete
+        await fetch("/api/calendar/events", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: rdv.title, start: rdv.start_time }),
+        });
+      }
+    } catch { }
     await supabase.from("rendez_vous").delete().eq("id", rdv.id);
     setLoading(false);
     onUpdated();

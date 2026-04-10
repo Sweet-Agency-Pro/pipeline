@@ -6,6 +6,14 @@ export const dynamic = "force-dynamic";
 
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
+// Google Calendar color IDs map
+export const COLOR_MAP = {
+  planifie: "1",  // Light Blue
+  confirme: "10", // Green
+  annule: "11",   // Red
+  termine: "8",   // Grey
+};
+
 function getGoogleAuth() {
   const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!credentials) {
@@ -63,7 +71,10 @@ export async function POST(request: NextRequest) {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(event),
+        body: JSON.stringify({
+          ...event,
+          colorId: COLOR_MAP.planifie
+        }),
       }
     );
 
@@ -157,13 +168,55 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ 
-      deleted: results.length > 0, 
+    return NextResponse.json({
+      deleted: results.length > 0,
       count: results.length,
-      details: results 
+      details: results
     });
   } catch (error) {
     console.error("Google Calendar delete error:", error);
     return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const body = await request.json();
+  const { calendarId, eventId, colorId } = body;
+
+  if (!calendarId || !eventId || !colorId) {
+    return NextResponse.json({ error: "calendarId, eventId, colorId requis" }, { status: 400 });
+  }
+
+  try {
+    const auth = getGoogleAuth();
+    const client = await auth.getClient();
+    const tokenRes = await client.getAccessToken();
+    const token = typeof tokenRes === "string" ? tokenRes : tokenRes.token;
+
+    const res = await fetch(
+      `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ colorId }),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      return NextResponse.json({ error: `GCal update failed: ${err}` }, { status: res.status });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Google Calendar PATCH error:", error);
+    return NextResponse.json({ error: "Erreur lors de la mise à jour Google" }, { status: 500 });
   }
 }
