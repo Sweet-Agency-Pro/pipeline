@@ -120,7 +120,8 @@ export async function DELETE(request: NextRequest) {
     const tokenRes = await client.getAccessToken();
     const token = typeof tokenRes === "string" ? tokenRes : tokenRes.token;
 
-    // Search for matching event in all calendars
+    // Search and delete matching event in ALL calendars
+    const results = [];
     for (const calId of calendarIds) {
       try {
         const startDate = new Date(start);
@@ -148,14 +149,19 @@ export async function DELETE(request: NextRequest) {
             `${CALENDAR_API}/calendars/${encodeURIComponent(calId)}/events/${match.id}`,
             { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
           );
-          return NextResponse.json({ deleted: true, calendarId: calId, eventId: match.id });
+          results.push({ calendarId: calId, eventId: match.id });
         }
-      } catch {
+      } catch (err) {
+        console.error(`Error deleting from ${calId}:`, err);
         continue;
       }
     }
 
-    return NextResponse.json({ deleted: false, reason: "no matching event found" });
+    return NextResponse.json({ 
+      deleted: results.length > 0, 
+      count: results.length,
+      details: results 
+    });
   } catch (error) {
     console.error("Google Calendar delete error:", error);
     return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });

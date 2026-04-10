@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CalendarPlus, ChevronLeft, ChevronRight, Mail, Calendar as CalendarIcon, Clock } from "lucide-react";
-import { format, addHours, addDays, startOfDay, endOfDay, parseISO, isSameDay, differenceInMinutes } from "date-fns";
+import { Loader2, CalendarPlus, ChevronLeft, ChevronRight, Mail, Calendar as CalendarIcon, Clock, Check, HelpCircle, Search, X } from "lucide-react";
+import { format, addHours, addMinutes, addDays, startOfDay, endOfDay, parseISO, isSameDay, differenceInMinutes } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
@@ -38,7 +38,7 @@ function getDefaults() {
   const now = new Date();
   return {
     start: format(now, "yyyy-MM-dd'T'HH:mm"),
-    end: format(addHours(now, 1), "yyyy-MM-dd'T'HH:mm"),
+    end: format(addMinutes(now, 30), "yyyy-MM-dd'T'HH:mm"),
   };
 }
 
@@ -94,24 +94,37 @@ function DateTimePicker({ value, onChange, label, className }: { value: string, 
   };
 
   const quickTimes = useMemo(() => {
-    return Array.from({ length: 24 * 4 }, (_, i) => {
+    const times = Array.from({ length: 24 * 4 }, (_, i) => {
       const h = Math.floor(i / 4).toString().padStart(2, "0");
       const m = ((i % 4) * 15).toString().padStart(2, "0");
       return `${h}:${m}`;
     });
-  }, []);
+    
+    // Add current time if it's not a multiple of 15
+    const currentTime = format(dateObj, "HH:mm");
+    if (!times.includes(currentTime)) {
+      times.push(currentTime);
+    }
+    
+    return times.sort((a, b) => a.localeCompare(b));
+  }, [dateObj]);
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
-    if (open) {
-      setTimeout(() => {
-        const activeItem = scrollRef.current?.querySelector("[data-active='true']");
-        activeItem?.scrollIntoView({ block: "center", behavior: "instant" });
-        // Restore focus to input if that's what triggered it
-        inputRef.current?.focus();
-      }, 50);
-    }
   };
+
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        const activeItem = scrollRef.current?.querySelector("[data-active='true']");
+        if (activeItem) {
+          activeItem.scrollIntoView({ block: "center", behavior: "instant" });
+        }
+        inputRef.current?.focus();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   return (
     <div className={cn("space-y-1.5", className)}>
@@ -142,9 +155,24 @@ function DateTimePicker({ value, onChange, label, className }: { value: string, 
               <Clock className="h-3.5 w-3.5 text-teal-500/70" />
               <input
                 ref={inputRef}
-                type="text"
+                type="search"
+                name={`time_${Math.random().toString(36).slice(2, 7)}`}
+                id={`time_${Math.random().toString(36).slice(2, 7)}`}
+                autoComplete="off"
+                data-lpignore="true"
+                data-1p-ignore
                 value={tempTime}
-                onFocus={() => setIsOpen(true)}
+                onFocus={(e) => {
+                  setIsOpen(true);
+                  e.currentTarget.select();
+                }}
+                onMouseDown={(e) => {
+                  // Prevent the click from triggering a blur-then-refocus cycle
+                  if (document.activeElement === e.currentTarget) {
+                    e.preventDefault();
+                    if (!isOpen) setIsOpen(true);
+                  }
+                }}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9:]/g, "");
                   setTempTime(val);
@@ -162,7 +190,7 @@ function DateTimePicker({ value, onChange, label, className }: { value: string, 
                     e.currentTarget.blur();
                   }
                 }}
-                className="bg-transparent border-none p-0 tabular-nums font-bold text-teal-400 text-sm w-12 focus:ring-0 focus:outline-none placeholder:text-teal-900 cursor-text"
+                className="bg-transparent border-none p-0 tabular-nums font-bold text-teal-400 text-sm w-12 focus:ring-0 focus:outline-none placeholder:text-teal-900 cursor-text [appearance:none] [&::-webkit-search-cancel-button]:hidden"
                 placeholder="00:00"
               />
             </div>
@@ -241,22 +269,64 @@ export function NouveauRdvDialog({
   const [form, setForm] = useState({
     title: "",
     client_id: "",
-    assigned_to: profiles[0]?.id || "",
-    google_calendar: calendarIds[0] || "",
+    assigned_to: [] as string[],
+    google_calendar: [] as string[],
+    unassigned: false,
     start_time: "",
     end_time: "",
     location: DEFAULT_LOCATION,
     description: "",
   });
 
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientResults, setShowClientResults] = useState(false);
+
+  const filteredClients = useMemo(() => {
+    if (!clientSearch.trim()) return clients;
+    const s = clientSearch.toLowerCase();
+    return clients.filter(c => c.label.toLowerCase().includes(s));
+  }, [clients, clientSearch]);
+
+  const selectedClient = useMemo(() => {
+    return clients.find(c => c.id === form.client_id);
+  }, [clients, form.client_id]);
+
+  const getCalendarLabel = (id: string) => {
+    if (id.includes("@group.calendar.google.com")) return "Attilio";
+    if (id.includes("mael")) return "Maël";
+    if (id.includes("#holiday@group.v.calendar.google.com")) return "Jours fériés";
+    const namePart = id.split("@")[0];
+    return namePart
+      .split(".")
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  const validUsers = useMemo(() => {
+    return calendarIds.map((cid, idx) => {
+      // Try to find a profile whose email matches the calendar ID (for individuals)
+      // Otherwise, fallback to the profile at the same index
+      const foundProfile = profiles.find(p => p.email && cid.toLowerCase().includes(p.email.toLowerCase())) 
+        || profiles[idx];
+      
+      if (!foundProfile) return null;
+      
+      return {
+        profile: foundProfile,
+        calendarId: cid
+      };
+    }).filter(Boolean) as { profile: Profile; calendarId: string }[];
+  }, [profiles, calendarIds]);
+
   useEffect(() => {
-    if (open) {
+    if (open && validUsers.length > 0) {
       const defaults = getDefaults();
       setForm({
         title: "",
         client_id: defaultClientId || "",
-        assigned_to: profiles[0]?.id || "",
-        google_calendar: calendarIds[0] || "",
+        assigned_to: [],
+        google_calendar: [],
+        unassigned: false,
         start_time: defaults.start,
         end_time: defaults.end,
         location: DEFAULT_LOCATION,
@@ -266,7 +336,7 @@ export function NouveauRdvDialog({
       setClientEmail("");
       setClientHasEmail(true);
     }
-  }, [open, profiles, defaultClientId]);
+  }, [open, validUsers, defaultClientId]);
 
   // Fetch client email when client changes
   useEffect(() => {
@@ -328,8 +398,8 @@ export function NouveauRdvDialog({
   // Color map
   const uniqueCalIds = useMemo(() => [...new Set(googleEvents.map((e) => e.calendarId))], [googleEvents]);
   const calColors = useMemo(
-    () => Object.fromEntries(uniqueCalIds.map((id, i) => [id, CALENDAR_COLORS[i % CALENDAR_COLORS.length]])),
-    [uniqueCalIds]
+    () => Object.fromEntries(calendarIds.map((id, i) => [id, CALENDAR_COLORS[i % CALENDAR_COLORS.length]])),
+    [calendarIds]
   );
 
   const previewHours = useMemo(() => Array.from({ length: PREVIEW_TOTAL_HOURS }, (_, i) => PREVIEW_HOUR_START + i), []);
@@ -371,7 +441,7 @@ export function NouveauRdvDialog({
     const { error } = await supabase.from("rendez_vous").insert({
       title: form.title,
       client_id: form.client_id || null,
-      assigned_to: form.assigned_to,
+      assigned_to: form.unassigned ? null : (form.assigned_to[0] || null), // Null if unassigned
       start_time: startISO,
       end_time: endISO,
       location: form.location || null,
@@ -379,11 +449,12 @@ export function NouveauRdvDialog({
       created_by: user?.id,
     });
 
-    // Push to the selected Google Calendar
-    if (!error) {
-      const assignedProfile = profiles.find((p) => p.id === form.assigned_to);
-      const calendarId = form.google_calendar;
-      if (calendarId) {
+    // Push to all selected Google Calendars (only if not unassigned)
+    if (!error && !form.unassigned) {
+      const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
+      
+      // Call GCal API for each selected calendar
+      await Promise.all(form.google_calendar.map(async (calendarId) => {
         try {
           await fetch("/api/calendar/events", {
             method: "POST",
@@ -398,9 +469,9 @@ export function NouveauRdvDialog({
             }),
           });
         } catch {
-          // Google Calendar push failed silently — RDV is already saved
+          // Individual push failed
         }
-      }
+      }));
 
       // Save email to client if it was manually entered
       const emailToUse = clientEmail.trim();
@@ -455,8 +526,8 @@ export function NouveauRdvDialog({
         const e = new Date(f.end_time);
 
         if (!isNaN(s.getTime()) && !isNaN(e.getTime()) && s >= e) {
-          // On avance la fin à start + 1h (le décalage par défaut)
-          next.end_time = format(addHours(s, 1), "yyyy-MM-dd'T'HH:mm");
+          // On avance la fin à start + 30 minutes (le décalage par défaut)
+          next.end_time = format(addMinutes(s, 30), "yyyy-MM-dd'T'HH:mm");
         }
       }
 
@@ -501,57 +572,196 @@ export function NouveauRdvDialog({
               />
             </div>
 
-            {/* Assigné + Calendrier Google */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-medium text-slate-400">Assigné à *</Label>
-                <select
-                  required
-                  value={form.assigned_to}
-                  onChange={(e) => update("assigned_to", e.target.value)}
-                  className={`mt-1.5 ${selectClass}`}
+            {/* Assigné à (Horizontal Toggle List) */}
+            <div className="space-y-3">
+              <Label className="text-xs font-medium text-slate-400">Assigné à *</Label>
+              <div className="flex flex-wrap gap-4">
+                {/* Option "À définir" */}
+                <button
+                  key="unassigned"
+                  type="button"
+                  onClick={() => {
+                    setForm(f => ({ ...f, unassigned: !f.unassigned, assigned_to: [], google_calendar: [] }));
+                  }}
+                  className="group flex flex-col items-center gap-2 outline-none"
                 >
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name || p.email}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label className="text-xs font-medium text-slate-400">Calendrier Google *</Label>
-                <select
-                  required
-                  value={form.google_calendar}
-                  onChange={(e) => update("google_calendar", e.target.value)}
-                  className={`mt-1.5 ${selectClass}`}
-                >
-                  {calendarIds.map((cid) => (
-                    <option key={cid} value={cid}>
-                      {cid.includes("@group.calendar.google.com")
-                        ? "Agence Sweet"
-                        : cid.split("@")[0]}
-                    </option>
-                  ))}
-                </select>
+                  <div className={cn(
+                    "relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-200 shadow-lg",
+                    form.unassigned 
+                      ? "border-amber-500 bg-amber-500/10 scale-110 ring-4 ring-amber-500/10" 
+                      : "border-slate-700 bg-slate-800 hover:border-slate-600 hover:bg-slate-700/80"
+                  )}>
+                    <HelpCircle className={cn(
+                      "h-6 w-6 transition-colors",
+                      form.unassigned ? "text-amber-400" : "text-slate-400 group-hover:text-slate-200"
+                    )} />
+                    {form.unassigned && (
+                      <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white border-2 border-slate-900">
+                        <Check className="h-3 w-3 bold" />
+                      </div>
+                    )}
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-medium transition-colors",
+                    form.unassigned ? "text-amber-400" : "text-slate-500 group-hover:text-slate-300"
+                  )}>
+                    À définir
+                  </span>
+                </button>
+
+                {validUsers.map((item) => {
+                  const p = item.profile;
+                  const calendarId = item.calendarId;
+                  const isSelected = form.assigned_to.includes(p.id);
+                  const label = getCalendarLabel(calendarId);
+                  const initials = p.full_name 
+                    ? p.full_name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) 
+                    : p.email?.split("@")[0].charAt(0).toUpperCase() || "??";
+
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setForm(f => {
+                          const isCurrentlySelected = f.assigned_to.includes(p.id);
+                          const newAssignedTo = isCurrentlySelected 
+                            ? f.assigned_to.filter(id => id !== p.id)
+                            : [...f.assigned_to, p.id];
+                          const newGoogleCalendar = isCurrentlySelected
+                            ? f.google_calendar.filter(id => id !== calendarId)
+                            : [...f.google_calendar, calendarId];
+                          
+                          return { ...f, unassigned: false, assigned_to: newAssignedTo, google_calendar: newGoogleCalendar };
+                        });
+                      }}
+                      className="group flex flex-col items-center gap-2 outline-none"
+                    >
+                      <div className={cn(
+                        "relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-200 shadow-lg",
+                        isSelected 
+                          ? "border-teal-500 bg-teal-500/10 scale-110 ring-4 ring-teal-500/10" 
+                          : "border-slate-700 bg-slate-800 hover:border-slate-600 hover:bg-slate-700/80"
+                      )}>
+                        <span className={cn(
+                          "text-sm font-bold",
+                          isSelected ? "text-teal-400" : "text-slate-400 group-hover:text-slate-200"
+                        )}>
+                          {initials}
+                        </span>
+                        {isSelected && (
+                          <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-white border-2 border-slate-900">
+                            <Check className="h-3 w-3 bold" />
+                          </div>
+                        )}
+                      </div>
+                      <span className={cn(
+                        "text-[10px] font-medium transition-colors",
+                        isSelected ? "text-teal-400" : "text-slate-500 group-hover:text-slate-300"
+                      )}>
+                        {label}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Client */}
-            <div>
+            {/* Client (Recherche interactive) */}
+            <div className="relative space-y-1.5">
               <Label className="text-xs font-medium text-slate-400">Client</Label>
-              <select
-                value={form.client_id}
-                onChange={(e) => update("client_id", e.target.value)}
-                className={`mt-1.5 ${selectClass}`}
-              >
-                <option value="">— Aucun —</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+              
+              {!form.client_id ? (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                  <Input
+                    type="search"
+                    name={`client_${Math.random().toString(36).slice(2, 7)}`}
+                    id={`client_${Math.random().toString(36).slice(2, 7)}`}
+                    placeholder="Chercher par nom, email ou société..."
+                    autoComplete="off"
+                    data-lpignore="true"
+                    data-1p-ignore
+                    value={clientSearch}
+                    onChange={(e) => {
+                      setClientSearch(e.target.value);
+                      setShowClientResults(true);
+                    }}
+                    onFocus={() => setShowClientResults(true)}
+                    onMouseDown={(e) => {
+                      if (document.activeElement === e.currentTarget) {
+                        e.preventDefault();
+                        if (!showClientResults) setShowClientResults(true);
+                      }
+                    }}
+                    className={cn(inputClass, "pl-10 h-11 [appearance:none] [&::-webkit-search-cancel-button]:hidden")}
+                  />
+                  {clientSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setClientSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+
+                  {/* Dropdown de résultats */}
+                  {showClientResults && (clientSearch || filteredClients.length > 0) && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => setShowClientResults(false)}
+                      />
+                      <div className="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl z-20 max-h-60 overflow-y-auto custom-scrollbar overflow-x-hidden">
+                        {filteredClients.length > 0 ? (
+                          <div className="p-1">
+                            {filteredClients.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => {
+                                  update("client_id", c.id);
+                                  setClientSearch("");
+                                  setShowClientResults(false);
+                                }}
+                                className="w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors group flex items-center"
+                              >
+                                <span className="text-sm font-medium text-slate-300 group-hover:text-white truncate">
+                                  {c.label}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-8 text-center">
+                            <p className="text-sm text-slate-500">Aucun client trouvé</p>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 p-3 bg-teal-500/10 border border-teal-500/30 rounded-xl group transition-all hover:bg-teal-500/15">
+                  <div className="h-10 w-10 rounded-full bg-teal-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-teal-400 font-bold">
+                      {selectedClient?.label.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-teal-300 truncate">{selectedClient?.label}</p>
+                    <p className="text-[10px] text-teal-500/70 uppercase tracking-wider font-medium">Client sélectionné</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => update("client_id", "")}
+                    className="p-2 hover:bg-teal-500/20 rounded-lg text-teal-500 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Email client */}
@@ -645,8 +855,8 @@ export function NouveauRdvDialog({
               <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-700/40 shrink-0">
                 {uniqueCalIds.map((id) => (
                   <div key={id} className="flex items-center gap-1">
-                    <div className={cn("h-1.5 w-1.5 rounded-full", calColors[id]?.text?.replace("text-", "bg-"))} />
-                    <span className="text-[9px] text-slate-500">{id.split("@")[0]}</span>
+                    <div className={cn("h-1.5 w-1.5 rounded-full", (calColors[id] || CALENDAR_COLORS[0]).text?.replace("text-", "bg-"))} />
+                    <span className="text-[9px] text-slate-500">{getCalendarLabel(id)}</span>
                   </div>
                 ))}
               </div>
@@ -669,7 +879,7 @@ export function NouveauRdvDialog({
                 {/* Existing Google events */}
                 {dayEvents.map((event) => {
                   const style = getBlockStyle(event.start, event.end);
-                  const colors = calColors[event.calendarId];
+                  const colors = calColors[event.calendarId] || CALENDAR_COLORS[0];
                   return (
                     <div
                       key={event.id}
