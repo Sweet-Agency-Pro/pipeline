@@ -954,7 +954,7 @@ export function NouveauRdvDialog({
                   {previewHours.map((h) => (
                     <div key={h} className="flex border-b border-slate-800/60 group" style={{ height: `${PREVIEW_HOUR_HEIGHT}px` }}>
                       <div className="w-11 shrink-0 bg-slate-950/20 border-r border-slate-800/40 flex items-start justify-end pr-2 pt-0.5">
-                        <span className="text-[9px] text-slate-600 tabular-nums">
+                        <span className="text-[9px] text-slate-500 font-medium tabular-nums">
                           {h.toString().padStart(2, "0")}:00
                         </span>
                       </div>
@@ -976,7 +976,7 @@ export function NouveauRdvDialog({
                         style={style}
                       >
                         <p className={cn("text-[10px] font-bold truncate leading-tight", colors?.text)}>{event.title}</p>
-                        <p className="text-[9px] text-slate-500 truncate">
+                        <p className="text-[9px] text-white truncate">
                           {format(parseISO(event.start), "HH:mm")}–{format(parseISO(event.end), "HH:mm")}
                         </p>
                       </div>

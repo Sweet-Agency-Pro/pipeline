@@ -218,10 +218,10 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
   const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
   const hours = useMemo(() => Array.from({ length: TOTAL_HOURS }, (_, i) => HOUR_START + i), []);
 
-  // Scroll to 8h on mount
+  // Scroll to 6h on mount
   useEffect(() => {
     if (gridRef.current) {
-      gridRef.current.scrollTop = 5 * HOUR_HEIGHT; // Scroll to 5 AM
+      gridRef.current.scrollTop = 6 * HOUR_HEIGHT; // Scroll to 6 AM (6 * 56 = 336px)
     }
   }, []);
 
