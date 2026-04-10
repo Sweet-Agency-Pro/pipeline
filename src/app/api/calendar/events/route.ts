@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { calendarId, title, start, end, location, description } = body;
 
-  console.log(`📝 POST event: calendar=${calendarId}, title=${title}`);
 
   if (!calendarId || !title || !start || !end) {
     return NextResponse.json(
