@@ -48,10 +48,10 @@ const PREVIEW_HOUR_HEIGHT = 40;
 const PREVIEW_TOTAL_HOURS = PREVIEW_HOUR_END - PREVIEW_HOUR_START;
 
 const CALENDAR_COLORS = [
-  { bg: "bg-amber-400/15", border: "border-l-amber-400", text: "text-amber-300" },
-  { bg: "bg-violet-400/15", border: "border-l-violet-400", text: "text-violet-300" },
-  { bg: "bg-rose-400/15", border: "border-l-rose-400", text: "text-rose-300" },
-  { bg: "bg-sky-400/15", border: "border-l-sky-400", text: "text-sky-300" },
+  { bg: "bg-cyan-400/60", border: "border-l-cyan-400", text: "text-white", dot: "bg-cyan-400" },
+  { bg: "bg-violet-400/60", border: "border-l-violet-400", text: "text-white", dot: "bg-violet-400" },
+  { bg: "bg-rose-400/60", border: "border-l-rose-400", text: "text-white", dot: "bg-rose-400" },
+  { bg: "bg-sky-400/60", border: "border-l-sky-400", text: "text-white", dot: "bg-sky-400" },
 ];
 
 const selectClass =
@@ -935,7 +935,7 @@ export function NouveauRdvDialog({
                       )}
                       style={style}
                     >
-                      <p className={cn("text-[10px] font-medium truncate leading-tight", colors?.text)}>{event.title}</p>
+                      <p className={cn("text-[10px] font-bold truncate leading-tight", colors?.text)}>{event.title}</p>
                       <p className="text-[9px] text-slate-500 truncate">
                         {format(parseISO(event.start), "HH:mm")}–{format(parseISO(event.end), "HH:mm")}
                       </p>
@@ -949,11 +949,11 @@ export function NouveauRdvDialog({
                   return (
                     <div
                       key={rdv.id}
-                      className="absolute left-8 right-1 rounded px-1.5 py-0.5 overflow-hidden border-l-2 bg-teal-500/10 border-l-teal-400"
+                      className="absolute left-8 right-1 rounded px-1.5 py-0.5 overflow-hidden border-l-[3px] bg-red-500/25 border-red-500/40 border-l-red-500"
                       style={style}
                     >
-                      <p className="text-[10px] font-medium text-teal-300 truncate leading-tight">{rdv.title}</p>
-                      <p className="text-[9px] text-slate-500 truncate">
+                      <p className="text-[10px] font-bold text-white truncate leading-tight">{rdv.title}</p>
+                      <p className="text-[9px] text-white/60 truncate">
                         {format(parseISO(rdv.start_time), "HH:mm")}–{format(parseISO(rdv.end_time), "HH:mm")}
                       </p>
                     </div>
@@ -963,10 +963,10 @@ export function NouveauRdvDialog({
                 {/* New RDV overlay */}
                 {newRdvOverlay && (
                   <div
-                    className="absolute left-8 right-1 rounded px-1.5 py-0.5 overflow-hidden border-l-2 bg-teal-500/25 border-l-teal-300 border border-teal-400/40 z-10"
+                    className="absolute left-8 right-1 rounded px-1.5 py-0.5 overflow-hidden border-l-[3px] bg-red-500/40 border-red-500/60 border-l-red-500 z-10 shadow-lg"
                     style={newRdvOverlay}
                   >
-                    <p className="text-[10px] font-semibold text-teal-200 truncate leading-tight">
+                    <p className="text-[10px] font-bold text-white truncate leading-tight">
                       {form.title || "Nouveau RDV"}
                     </p>
                   </div>
