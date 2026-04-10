@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, CalendarPlus, ChevronLeft, ChevronRight, Mail, Calendar as CalendarIcon, Clock, Check, HelpCircle, Search, X } from "lucide-react";
+import { Loader2, CalendarPlus, ChevronLeft, ChevronRight, Mail, Calendar as CalendarIcon, Clock, Check, HelpCircle, Search, X, Copy, ExternalLink, Video, MapPin } from "lucide-react";
 import { format, addHours, addMinutes, addDays, startOfDay, endOfDay, parseISO, isSameDay, differenceInMinutes } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -99,13 +99,13 @@ function DateTimePicker({ value, onChange, label, className }: { value: string, 
       const m = ((i % 4) * 15).toString().padStart(2, "0");
       return `${h}:${m}`;
     });
-    
+
     // Add current time if it's not a multiple of 15
     const currentTime = format(dateObj, "HH:mm");
     if (!times.includes(currentTime)) {
       times.push(currentTime);
     }
-    
+
     return times.sort((a, b) => a.localeCompare(b));
   }, [dateObj]);
 
@@ -278,6 +278,16 @@ export function NouveauRdvDialog({
     description: "",
   });
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-resize notes textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [form.description]);
+
   const [clientSearch, setClientSearch] = useState("");
   const [showClientResults, setShowClientResults] = useState(false);
 
@@ -306,11 +316,11 @@ export function NouveauRdvDialog({
     return calendarIds.map((cid, idx) => {
       // Try to find a profile whose email matches the calendar ID (for individuals)
       // Otherwise, fallback to the profile at the same index
-      const foundProfile = profiles.find(p => p.email && cid.toLowerCase().includes(p.email.toLowerCase())) 
+      const foundProfile = profiles.find(p => p.email && cid.toLowerCase().includes(p.email.toLowerCase()))
         || profiles[idx];
-      
+
       if (!foundProfile) return null;
-      
+
       return {
         profile: foundProfile,
         calendarId: cid
@@ -452,7 +462,7 @@ export function NouveauRdvDialog({
     // Push to all selected Google Calendars (only if not unassigned)
     if (!error && !form.unassigned) {
       const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
-      
+
       // Call GCal API for each selected calendar
       await Promise.all(form.google_calendar.map(async (calendarId) => {
         try {
@@ -572,105 +582,150 @@ export function NouveauRdvDialog({
               />
             </div>
 
-            {/* Assigné à (Horizontal Toggle List) */}
-            <div className="space-y-3">
-              <Label className="text-xs font-medium text-slate-400">Assigné à *</Label>
-              <div className="flex flex-wrap gap-4">
-                {/* Option "À définir" */}
-                <button
-                  key="unassigned"
-                  type="button"
-                  onClick={() => {
-                    setForm(f => ({ ...f, unassigned: !f.unassigned, assigned_to: [], google_calendar: [] }));
-                  }}
-                  className="group flex flex-col items-center gap-2 outline-none"
-                >
-                  <div className={cn(
-                    "relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-200 shadow-lg",
-                    form.unassigned 
-                      ? "border-amber-500 bg-amber-500/10 scale-110 ring-4 ring-amber-500/10" 
-                      : "border-slate-700 bg-slate-800 hover:border-slate-600 hover:bg-slate-700/80"
-                  )}>
-                    <HelpCircle className={cn(
-                      "h-6 w-6 transition-colors",
-                      form.unassigned ? "text-amber-400" : "text-slate-400 group-hover:text-slate-200"
-                    )} />
-                    {form.unassigned && (
-                      <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white border-2 border-slate-900">
-                        <Check className="h-3 w-3 bold" />
-                      </div>
-                    )}
-                  </div>
-                  <span className={cn(
-                    "text-[10px] font-medium transition-colors",
-                    form.unassigned ? "text-amber-400" : "text-slate-500 group-hover:text-slate-300"
-                  )}>
-                    À définir
-                  </span>
-                </button>
+            {/* Assigné à & Lieu Row */}
+            <div className="grid md:grid-cols-2 gap-3 items-start">
+              {/* Assigné à (Horizontal Toggle List) */}
+              <div className="space-y-3 min-w-0">
+                <Label className="text-xs font-medium text-slate-400">Assigné à *</Label>
+                <div className="flex flex-wrap gap-3">
+                  {/* Option "À définir" */}
+                  <button
+                    key="unassigned"
+                    type="button"
+                    onClick={() => {
+                      setForm(f => ({ ...f, unassigned: !f.unassigned, assigned_to: [], google_calendar: [] }));
+                    }}
+                    className="group flex flex-col items-center gap-2 outline-none"
+                  >
+                    <div className={cn(
+                      "relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-200 shadow-lg",
+                      form.unassigned
+                        ? "border-amber-500 bg-amber-500/10 scale-110 ring-4 ring-amber-500/10"
+                        : "border-slate-700 bg-slate-800 hover:border-slate-600 hover:bg-slate-700/80"
+                    )}>
+                      <HelpCircle className={cn(
+                        "h-6 w-6 transition-colors",
+                        form.unassigned ? "text-amber-400" : "text-slate-400 group-hover:text-slate-200"
+                      )} />
+                      {form.unassigned && (
+                        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-white border-2 border-slate-900">
+                          <Check className="h-3 w-3 bold" />
+                        </div>
+                      )}
+                    </div>
+                    <span className={cn(
+                      "text-[10px] font-medium transition-colors",
+                      form.unassigned ? "text-amber-400" : "text-slate-500 group-hover:text-slate-300"
+                    )}>
+                      À définir
+                    </span>
+                  </button>
 
-                {validUsers.map((item) => {
-                  const p = item.profile;
-                  const calendarId = item.calendarId;
-                  const isSelected = form.assigned_to.includes(p.id);
-                  const label = getCalendarLabel(calendarId);
-                  const initials = p.full_name 
-                    ? p.full_name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) 
-                    : p.email?.split("@")[0].charAt(0).toUpperCase() || "??";
+                  {validUsers.map((item) => {
+                    const p = item.profile;
+                    const calendarId = item.calendarId;
+                    const isSelected = form.assigned_to.includes(p.id);
+                    const label = getCalendarLabel(calendarId);
+                    const initials = p.full_name
+                      ? p.full_name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+                      : p.email?.split("@")[0].charAt(0).toUpperCase() || "??";
 
-                  return (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => {
-                        setForm(f => {
-                          const isCurrentlySelected = f.assigned_to.includes(p.id);
-                          const newAssignedTo = isCurrentlySelected 
-                            ? f.assigned_to.filter(id => id !== p.id)
-                            : [...f.assigned_to, p.id];
-                          const newGoogleCalendar = isCurrentlySelected
-                            ? f.google_calendar.filter(id => id !== calendarId)
-                            : [...f.google_calendar, calendarId];
-                          
-                          return { ...f, unassigned: false, assigned_to: newAssignedTo, google_calendar: newGoogleCalendar };
-                        });
-                      }}
-                      className="group flex flex-col items-center gap-2 outline-none"
-                    >
-                      <div className={cn(
-                        "relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-200 shadow-lg",
-                        isSelected 
-                          ? "border-teal-500 bg-teal-500/10 scale-110 ring-4 ring-teal-500/10" 
-                          : "border-slate-700 bg-slate-800 hover:border-slate-600 hover:bg-slate-700/80"
-                      )}>
-                        <span className={cn(
-                          "text-sm font-bold",
-                          isSelected ? "text-teal-400" : "text-slate-400 group-hover:text-slate-200"
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setForm(f => {
+                            const isCurrentlySelected = f.assigned_to.includes(p.id);
+                            const newAssignedTo = isCurrentlySelected
+                              ? f.assigned_to.filter(id => id !== p.id)
+                              : [...f.assigned_to, p.id];
+                            const newGoogleCalendar = isCurrentlySelected
+                              ? f.google_calendar.filter(id => id !== calendarId)
+                              : [...f.google_calendar, calendarId];
+
+                            return { ...f, unassigned: false, assigned_to: newAssignedTo, google_calendar: newGoogleCalendar };
+                          });
+                        }}
+                        className="group flex flex-col items-center gap-2 outline-none"
+                      >
+                        <div className={cn(
+                          "relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-200 shadow-lg",
+                          isSelected
+                            ? "border-teal-500 bg-teal-500/10 scale-110 ring-4 ring-teal-500/10"
+                            : "border-slate-700 bg-slate-800 hover:border-slate-600 hover:bg-slate-700/80"
                         )}>
-                          {initials}
+                          <span className={cn(
+                            "text-sm font-bold",
+                            isSelected ? "text-teal-400" : "text-slate-400 group-hover:text-slate-200"
+                          )}>
+                            {initials}
+                          </span>
+                          {isSelected && (
+                            <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-white border-2 border-slate-900">
+                              <Check className="h-3 w-3 bold" />
+                            </div>
+                          )}
+                        </div>
+                        <span className={cn(
+                          "text-[10px] font-medium transition-colors",
+                          isSelected ? "text-teal-400" : "text-slate-500 group-hover:text-slate-300"
+                        )}>
+                          {label}
                         </span>
-                        {isSelected && (
-                          <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-teal-500 text-white border-2 border-slate-900">
-                            <Check className="h-3 w-3 bold" />
-                          </div>
-                        )}
-                      </div>
-                      <span className={cn(
-                        "text-[10px] font-medium transition-colors",
-                        isSelected ? "text-teal-400" : "text-slate-500 group-hover:text-slate-300"
-                      )}>
-                        {label}
-                      </span>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Lieu (Stylisé) */}
+              <div className="space-y-3 min-w-0 flex flex-col">
+                <Label className="text-xs font-medium text-slate-400">Lien ou lieu du rendez-vous</Label>
+                <div className="relative group flex items-center">
+                  <div className="absolute left-1.5 h-8 w-8 rounded-lg bg-slate-800/80 flex items-center justify-center border border-slate-700/50 shadow-sm transition-colors group-focus-within:border-teal-500/30 group-focus-within:text-teal-400 text-slate-400 z-10 pointer-events-none">
+                    {form.location?.startsWith("http") ? <Video className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                  </div>
+                  <Input
+                    placeholder="Visio, Bureau, Lien Jitsi..."
+                    value={form.location || ""}
+                    onChange={(e) => update("location", e.target.value)}
+                    className={cn(inputClass, "mt-0 pl-11 pr-20 h-11 rounded-xl bg-slate-900/40 border-slate-700/60 transition-all hover:bg-slate-900/60 focus:bg-slate-900")}
+                  />
+                  {form.location && (
+                    <div className="absolute right-1.5 flex items-center gap-0.5 z-10">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-400 hover:text-teal-400 hover:bg-teal-500/10 rounded-md bg-slate-900/50"
+                        onClick={() => navigator.clipboard.writeText(form.location)}
+                        title="Copier le texte"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                      </Button>
+                      {form.location.startsWith("http") && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-slate-400 hover:text-teal-400 hover:bg-teal-500/10 rounded-md bg-slate-900/50"
+                          onClick={() => window.open(form.location, "_blank")}
+                          title="Ouvrir le lien"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Client (Recherche interactive) */}
             <div className="relative space-y-1.5">
               <Label className="text-xs font-medium text-slate-400">Client</Label>
-              
+
               {!form.client_id ? (
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -709,8 +764,8 @@ export function NouveauRdvDialog({
                   {/* Dropdown de résultats */}
                   {showClientResults && (clientSearch || filteredClients.length > 0) && (
                     <>
-                      <div 
-                        className="fixed inset-0 z-10" 
+                      <div
+                        className="fixed inset-0 z-10"
                         onClick={() => setShowClientResults(false)}
                       />
                       <div className="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl z-20 max-h-60 overflow-y-auto custom-scrollbar overflow-x-hidden">
@@ -782,26 +837,17 @@ export function NouveauRdvDialog({
               </div>
             )}
 
-            {/* Lieu */}
-            <div>
-              <Label className="text-xs font-medium text-slate-400">Lieu</Label>
-              <Input
-                placeholder="Visio / Bureau / Adresse..."
-                value={form.location}
-                onChange={(e) => update("location", e.target.value)}
-                className={inputClass}
-              />
-            </div>
+
 
             {/* Notes */}
             <div>
               <Label className="text-xs font-medium text-slate-400">Notes</Label>
               <Textarea
+                ref={textareaRef}
                 placeholder="Informations complémentaires..."
                 value={form.description}
                 onChange={(e) => update("description", e.target.value)}
-                className={`mt-1.5 bg-slate-900/60 border-slate-700/60 text-slate-200 placeholder:text-slate-600 focus-visible:border-teal-500/50 focus-visible:ring-teal-500/20 resize-none`}
-                rows={2}
+                className={`mt-1.5 bg-slate-900/60 border-slate-700/60 text-slate-200 placeholder:text-slate-600 focus-visible:border-teal-500/50 focus-visible:ring-teal-500/20 resize-none overflow-hidden min-h-[80px] transition-[height] duration-100 ease-out`}
               />
             </div>
 
