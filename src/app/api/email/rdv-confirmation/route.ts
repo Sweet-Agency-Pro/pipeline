@@ -43,7 +43,7 @@ function buildHtml({
   endTime,
   location,
   description,
-  assignedName,
+  isUpdate,
 }: {
   title: string;
   date: string;
@@ -51,7 +51,7 @@ function buildHtml({
   endTime: string;
   location: string | null;
   description: string | null;
-  assignedName: string | null;
+  isUpdate?: boolean;
 }) {
   const locationIsLink = location && isValidUrl(location);
   const locationHtml = location
@@ -59,6 +59,11 @@ function buildHtml({
       ? `<a href="${location}" style="color:#14b8a6;text-decoration:none;font-weight:500;">Rejoindre la visio ↗</a>`
       : location
     : "À définir";
+
+  const headerTitle = isUpdate ? "Rendez-vous modifié" : "Rendez-vous confirmé";
+  const introText = isUpdate
+    ? "Nous vous informons que votre rendez-vous a été modifié. Voici les nouvelles informations :"
+    : "Nous avons le plaisir de vous confirmer votre rendez-vous :";
 
   return `
 <!DOCTYPE html>
@@ -69,7 +74,7 @@ function buildHtml({
     
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:32px 28px;text-align:center;">
-      <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">Rendez-vous confirmé</h1>
+      <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">${headerTitle}</h1>
       <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Agence Sweet</p>
     </div>
 
@@ -77,7 +82,7 @@ function buildHtml({
     <div style="padding:28px;">
       <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.5;">
         Bonjour,<br><br>
-        Nous avons le plaisir de vous confirmer votre rendez-vous :
+        ${introText}
       </p>
 
       <div style="background:#f8fafc;border-radius:8px;padding:20px;margin-bottom:20px;">
@@ -98,19 +103,8 @@ function buildHtml({
             <td style="padding:6px 0;color:#64748b;font-size:13px;">Lieu</td>
             <td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:500;">${locationHtml}</td>
           </tr>
-          ${assignedName ? `
-          <tr>
-            <td style="padding:6px 0;color:#64748b;font-size:13px;">Avec</td>
-            <td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:500;">${assignedName}</td>
-          </tr>` : ""}
         </table>
       </div>
-
-      ${description ? `
-      <div style="margin-bottom:20px;">
-        <p style="margin:0 0 4px;color:#64748b;font-size:13px;">Notes :</p>
-        <p style="margin:0;color:#334155;font-size:14px;line-height:1.5;">${description}</p>
-      </div>` : ""}
 
       ${locationIsLink ? `
       <div style="text-align:center;margin:24px 0 8px;">
@@ -120,7 +114,9 @@ function buildHtml({
       </div>` : ""}
 
       <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;line-height:1.5;">
-        En cas d'empêchement, merci de nous prévenir le plus tôt possible en répondant à cet email.
+        ${isUpdate
+      ? "Si cette modification ne fait pas suite à votre demande ou si ce nouveau créneau ne vous convient pas, n'hésitez pas à nous contacter en répondant à cet email."
+      : "En cas d'empêchement, merci de nous prévenir le plus tôt possible en répondant à cet email."}
       </p>
     </div>
 
@@ -145,7 +141,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { clientEmail, clientName, title, start, end, location, description, assignedName } = body;
+  const { clientEmail, clientName, title, start, end, location, description, isUpdate } = body;
 
   if (!clientEmail || !title || !start || !end) {
     return NextResponse.json({ error: "clientEmail, title, start et end requis" }, { status: 400 });
@@ -154,11 +150,13 @@ export async function POST(request: NextRequest) {
   const fromName = process.env.SMTP_FROM_NAME || "Agence Sweet";
   const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
 
+  const subjectPrefix = isUpdate ? "Modification de rendez-vous" : "Confirmation de rendez-vous";
+
   try {
     await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
       to: clientEmail,
-      subject: `Confirmation de rendez-vous — ${title}`,
+      subject: `${subjectPrefix} — ${title}`,
       html: buildHtml({
         title,
         date: formatDate(start),
@@ -166,7 +164,7 @@ export async function POST(request: NextRequest) {
         endTime: formatTime(end),
         location: location || null,
         description: description || null,
-        assignedName: assignedName || null,
+        isUpdate,
       }),
     });
 

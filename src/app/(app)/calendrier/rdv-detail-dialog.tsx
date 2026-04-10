@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import {
   CircleDot,
   FileText,
   Edit2,
+  X,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -119,7 +121,30 @@ export function RdvDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="bg-slate-900 border-slate-700/60 text-slate-200 sm:max-w-md p-0 gap-0 overflow-hidden">
+      <DialogContent showCloseButton={false} className="bg-slate-900 border-slate-700/60 text-slate-200 sm:max-w-md p-0 gap-0 overflow-hidden">
+        {/* Top actions group */}
+        <div className="absolute top-2 right-2 flex gap-1 z-50">
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            disabled={loading}
+            onClick={() => onEdit(rdv)}
+            className="h-8 w-8 text-slate-400 hover:text-teal-400 hover:bg-slate-800"
+            title="Modifier"
+          >
+            <Edit2 className="h-4 w-4" />
+          </Button>
+          <DialogClose render={
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-slate-800"
+            />
+          }>
+            <X className="h-4 w-4" />
+          </DialogClose>
+        </div>
+
         {/* Header with accent */}
         <div className="border-b border-slate-800 px-6 pt-6 pb-4">
           <DialogHeader>
@@ -172,14 +197,14 @@ export function RdvDetailDialog({
 
         {/* Actions */}
         <div className="border-t border-slate-800 px-6 py-4 flex items-center justify-between">
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto">
             {rdv.status !== "confirme" && (
               <Button
                 size="sm"
                 variant="ghost"
                 disabled={loading}
                 onClick={() => updateStatus("confirme")}
-                className="h-8 text-xs text-teal-400 hover:text-teal-300 hover:bg-teal-500/10"
+                className="h-8 text-xs text-teal-400 hover:text-teal-300 hover:bg-teal-500/10 shrink-0"
               >
                 <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                 Confirmer
@@ -191,7 +216,7 @@ export function RdvDetailDialog({
                 variant="ghost"
                 disabled={loading}
                 onClick={() => updateStatus("termine")}
-                className="h-8 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                className="h-8 text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800 shrink-0"
               >
                 <CircleDot className="mr-1.5 h-3.5 w-3.5" />
                 Terminé
@@ -203,7 +228,7 @@ export function RdvDetailDialog({
                 variant="ghost"
                 disabled={loading}
                 onClick={() => updateStatus("annule")}
-                className="h-8 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                className="h-8 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 shrink-0"
               >
                 <XCircle className="mr-1.5 h-3.5 w-3.5" />
                 Annuler
@@ -211,26 +236,15 @@ export function RdvDetailDialog({
             )}
           </div>
 
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={loading}
-              onClick={() => onEdit(rdv)}
-              className="h-8 text-xs text-slate-500 hover:text-teal-400 hover:bg-teal-500/10"
-            >
-              <Edit2 className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={loading}
-              onClick={deleteRdv}
-              className="h-8 text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/10"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={loading}
+            onClick={deleteRdv}
+            className="h-8 text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

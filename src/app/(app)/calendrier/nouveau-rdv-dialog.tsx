@@ -507,6 +507,12 @@ export function NouveauRdvDialog({
     let error = null;
 
     if (initialRdv) {
+      // Logic: if it was "termine" but moved to the future, reset to "planifie"
+      const now = new Date();
+      const newStart = new Date(startISO);
+      const shouldResetStatus = initialRdv.status === "termine" && newStart > now;
+      const statusToSet = shouldResetStatus ? "planifie" : undefined;
+
       const { error: err } = await supabase
         .from("rendez_vous")
         .update({
@@ -517,9 +523,32 @@ export function NouveauRdvDialog({
           end_time: endISO,
           location: form.location || null,
           description: form.description || null,
+          ...(statusToSet ? { status: statusToSet } : {}),
         })
         .eq("id", initialRdv.id);
       error = err;
+
+      // Sync with Google Calendar if it's already linked
+      if (!error && initialRdv.google_event_id && initialRdv.google_calendar_id) {
+        try {
+          await fetch("/api/calendar/events", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              calendarId: initialRdv.google_calendar_id,
+              eventId: initialRdv.google_event_id,
+              title: form.title,
+              start: startISO,
+              end: endISO,
+              location: form.location || null,
+              description: form.description || null,
+              ...(shouldResetStatus ? { colorId: "1" } : {}), // Reset color to Blue if moved to future
+            }),
+          });
+        } catch (err) {
+          console.error("GCal edit sync failed:", err);
+        }
+      }
     } else {
       const { error: err } = await supabase.from("rendez_vous").insert({
         title: form.title,
@@ -532,67 +561,60 @@ export function NouveauRdvDialog({
         created_by: user?.id,
       });
       error = err;
-    }
 
-    // Push to all selected Google Calendars (only if not unassigned)
-    if (!error && !form.unassigned && !initialRdv) {
-      const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
+      // Google Calendar Creation (only for new RDVs)
+      if (!error && !form.unassigned) {
+        let savedEventId: string | null = null;
+        let savedCalId: string | null = null;
 
-
-      // Call GCal API for each selected calendar
-      let savedEventId: string | null = null;
-      let savedCalId: string | null = null;
-
-      await Promise.all(form.google_calendar.map(async (calendarId) => {
-        try {
-          const gRes = await fetch("/api/calendar/events", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              calendarId,
-              title: form.title,
-              start: startISO,
-              end: endISO,
-              location: form.location || undefined,
-              description: form.description || undefined,
-            }),
-          });
-          if (gRes.ok) {
-            const data = await gRes.json();
-            if (!savedEventId) {
-              savedEventId = data.eventId;
-              savedCalId = calendarId;
+        await Promise.all(form.google_calendar.map(async (calendarId) => {
+          try {
+            const gRes = await fetch("/api/calendar/events", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                calendarId,
+                title: form.title,
+                start: startISO,
+                end: endISO,
+                location: form.location || undefined,
+                description: form.description || undefined,
+              }),
+            });
+            if (gRes.ok) {
+              const data = await gRes.json();
+              if (!savedEventId) {
+                savedEventId = data.eventId;
+                savedCalId = calendarId;
+              }
             }
-          }
-        } catch {
-          // Individual push failed
-        }
-      }));
+          } catch { /* Silent fail */ }
+        }));
 
-      // Update the RDV with the first GCal ID for future sync
-      if (savedEventId) {
-        // Fetch the ID of the inserted RDV by the current user
-        const { data: latest } = await supabase
-          .from("rendez_vous")
-          .select("id")
-          .eq("created_by", user?.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-        
-        if (latest) {
-          await supabase
+        if (savedEventId) {
+          const { data: latest } = await supabase
             .from("rendez_vous")
-            .update({ 
-              google_event_id: savedEventId,
-              google_calendar_id: savedCalId 
-            })
-            .eq("id", latest.id);
+            .select("id")
+            .eq("created_by", user?.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .single();
+          
+          if (latest) {
+            await supabase
+              .from("rendez_vous")
+              .update({ google_event_id: savedEventId, google_calendar_id: savedCalId })
+              .eq("id", latest.id);
+          }
         }
       }
+    }
 
-      // Save email to client if it was manually entered
+    // --- Common actions for both New and Update ---
+    if (!error && !form.unassigned) {
       const emailToUse = clientEmail.trim();
+      
+      // Update client email if entered manually
       if (form.client_id && emailToUse && !clientHasEmail) {
         await supabase
           .from("clients")
@@ -600,7 +622,7 @@ export function NouveauRdvDialog({
           .eq("id", form.client_id);
       }
 
-      // Send confirmation email to client
+      // Send Email Notification
       if (form.client_id && emailToUse) {
         try {
           const { data: clientData } = await supabase
@@ -608,7 +630,9 @@ export function NouveauRdvDialog({
             .select("first_name, last_name")
             .eq("id", form.client_id)
             .single();
+          
           if (clientData) {
+            const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
             await fetch("/api/email/rdv-confirmation", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -621,11 +645,12 @@ export function NouveauRdvDialog({
                 location: form.location || undefined,
                 description: form.description || undefined,
                 assignedName: assignedProfile?.full_name || undefined,
+                isUpdate: !!initialRdv,
               }),
             });
           }
-        } catch {
-          // Email failed silently — RDV is already saved
+        } catch (err) {
+          console.error("Email notification failed:", err);
         }
       }
     }
