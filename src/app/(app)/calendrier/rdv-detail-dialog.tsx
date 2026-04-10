@@ -20,6 +20,7 @@ import {
   XCircle,
   CircleDot,
   FileText,
+  Edit2,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -32,6 +33,7 @@ interface RdvDetailDialogProps {
   open: boolean;
   onClose: () => void;
   onUpdated: () => void;
+  onEdit: (rdv: RendezVous) => void;
   profiles: Profile[];
 }
 
@@ -40,6 +42,7 @@ export function RdvDetailDialog({
   open,
   onClose,
   onUpdated,
+  onEdit,
 }: RdvDetailDialogProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
@@ -208,15 +211,26 @@ export function RdvDetailDialog({
             )}
           </div>
 
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={loading}
-            onClick={deleteRdv}
-            className="h-8 text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/10"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={loading}
+              onClick={() => onEdit(rdv)}
+              className="h-8 text-xs text-slate-500 hover:text-teal-400 hover:bg-teal-500/10"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={loading}
+              onClick={deleteRdv}
+              className="h-8 text-xs text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

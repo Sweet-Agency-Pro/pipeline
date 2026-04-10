@@ -32,6 +32,7 @@ interface NouveauRdvDialogProps {
   clients: { id: string; label: string }[];
   calendarIds: string[];
   defaultClientId?: string;
+  initialRdv?: RendezVous;
 }
 
 function getDefaults() {
@@ -254,6 +255,7 @@ export function NouveauRdvDialog({
   clients,
   calendarIds,
   defaultClientId,
+  initialRdv,
 }: NouveauRdvDialogProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
@@ -355,23 +357,38 @@ export function NouveauRdvDialog({
 
   useEffect(() => {
     if (open && validUsers.length > 0) {
-      const defaults = getDefaults();
-      setForm({
-        title: "",
-        client_id: defaultClientId || "",
-        assigned_to: [],
-        google_calendar: [],
-        unassigned: false,
-        start_time: defaults.start,
-        end_time: defaults.end,
-        location: DEFAULT_LOCATION,
-        description: "",
-      });
-      setPreviewDate(new Date());
+      if (initialRdv) {
+        setForm({
+          title: initialRdv.title,
+          client_id: initialRdv.client_id || "",
+          assigned_to: initialRdv.assigned_to ? [initialRdv.assigned_to] : [],
+          google_calendar: [],
+          unassigned: !initialRdv.assigned_to,
+          start_time: format(parseISO(initialRdv.start_time), "yyyy-MM-dd'T'HH:mm"),
+          end_time: format(parseISO(initialRdv.end_time), "yyyy-MM-dd'T'HH:mm"),
+          location: initialRdv.location || DEFAULT_LOCATION,
+          description: initialRdv.description || "",
+        });
+        setPreviewDate(parseISO(initialRdv.start_time));
+      } else {
+        const defaults = getDefaults();
+        setForm({
+          title: "",
+          client_id: defaultClientId || "",
+          assigned_to: [],
+          google_calendar: [],
+          unassigned: false,
+          start_time: defaults.start,
+          end_time: defaults.end,
+          location: DEFAULT_LOCATION,
+          description: "",
+        });
+        setPreviewDate(new Date());
+      }
       setClientEmail("");
       setClientHasEmail(true);
     }
-  }, [open, validUsers, defaultClientId]);
+  }, [open, validUsers, defaultClientId, initialRdv]);
 
   // Fetch client email when client changes
   useEffect(() => {
@@ -487,20 +504,40 @@ export function NouveauRdvDialog({
     const startISO = new Date(form.start_time).toISOString();
     const endISO = new Date(form.end_time).toISOString();
 
-    const { error } = await supabase.from("rendez_vous").insert({
-      title: form.title,
-      client_id: form.client_id || null,
-      assigned_to: form.unassigned ? null : (form.assigned_to[0] || null), // Null if unassigned
-      start_time: startISO,
-      end_time: endISO,
-      location: form.location || null,
-      description: form.description || null,
-      created_by: user?.id,
-    });
+    let error = null;
+
+    if (initialRdv) {
+      const { error: err } = await supabase
+        .from("rendez_vous")
+        .update({
+          title: form.title,
+          client_id: form.client_id || null,
+          assigned_to: form.unassigned ? null : (form.assigned_to[0] || null),
+          start_time: startISO,
+          end_time: endISO,
+          location: form.location || null,
+          description: form.description || null,
+        })
+        .eq("id", initialRdv.id);
+      error = err;
+    } else {
+      const { error: err } = await supabase.from("rendez_vous").insert({
+        title: form.title,
+        client_id: form.client_id || null,
+        assigned_to: form.unassigned ? null : (form.assigned_to[0] || null), // Null if unassigned
+        start_time: startISO,
+        end_time: endISO,
+        location: form.location || null,
+        description: form.description || null,
+        created_by: user?.id,
+      });
+      error = err;
+    }
 
     // Push to all selected Google Calendars (only if not unassigned)
-    if (!error && !form.unassigned) {
+    if (!error && !form.unassigned && !initialRdv) {
       const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
+
 
       // Call GCal API for each selected calendar
       let savedEventId: string | null = null;
@@ -620,7 +657,9 @@ export function NouveauRdvDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="bg-slate-900 border-slate-700/60 text-slate-200 sm:max-w-4xl p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle className="text-lg font-semibold text-white">Nouveau rendez-vous</DialogTitle>
+          <DialogTitle className="text-lg font-semibold text-white">
+            {initialRdv ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex min-h-0">
@@ -942,9 +981,9 @@ export function NouveauRdvDialog({
                 {loading ? (
                   <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
+                  initialRdv ? <Check className="mr-1.5 h-3.5 w-3.5" /> : <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
                 )}
-                {loading ? "Création..." : "Créer le RDV"}
+                {loading ? (initialRdv ? "Mise à jour..." : "Création...") : (initialRdv ? "Enregistrer" : "Créer le RDV")}
               </Button>
             </div>
           </form>
@@ -1017,6 +1056,7 @@ export function NouveauRdvDialog({
 
                   {/* Existing Pipeline RDVs */}
                   {dayRdvs.map((rdv) => {
+                    if (initialRdv && rdv.id === initialRdv.id) return null;
                     const style = getBlockStyle(rdv.start_time, rdv.end_time);
                     return (
                       <div
@@ -1039,7 +1079,7 @@ export function NouveauRdvDialog({
                       style={newRdvOverlay}
                     >
                       <p className="text-[10px] font-bold text-white truncate leading-tight">
-                        {form.title || "Nouveau RDV"}
+                        {form.title || (initialRdv ? "Modification" : "Nouveau RDV")}
                       </p>
                     </div>
                   )}

@@ -202,6 +202,7 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
   const [loading, setLoading] = useState(true);
   const [showNewRdv, setShowNewRdv] = useState(false);
   const [selectedRdv, setSelectedRdv] = useState<RendezVous | null>(null);
+  const [editingRdv, setEditingRdv] = useState<RendezVous | null>(null);
   const [expandedAgendas, setExpandedAgendas] = useState(true);
   const [expandedUpcoming, setExpandedUpcoming] = useState(true);
   const [hoverTooltip, setHoverTooltip] = useState<{ x: number; y: number; content: string } | null>(null);
@@ -270,8 +271,15 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
   const isCurrentWeek = isSameDay(weekStart, startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   // Callbacks
-  const handleRdvCreated = () => { setShowNewRdv(false); loadRdvs(); };
-  const handleRdvUpdated = () => { setSelectedRdv(null); loadRdvs(); };
+  const handleRdvCreated = () => { setShowNewRdv(false); setEditingRdv(null); loadRdvs(); };
+  const handleRdvUpdated = () => { setSelectedRdv(null); setEditingRdv(null); loadRdvs(); };
+
+  const handleEditRdv = (rdv: RendezVous) => {
+    setSelectedRdv(null);
+    setEditingRdv(rdv);
+    setShowNewRdv(true);
+  };
+
 
   // Helpers
   const getEventsForDay = (day: Date) => {
@@ -767,8 +775,12 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
       {/* ── Dialogs ── */}
       <NouveauRdvDialog
         open={showNewRdv}
-        onClose={() => setShowNewRdv(false)}
+        onClose={() => {
+          setShowNewRdv(false);
+          setEditingRdv(null);
+        }}
         onCreated={handleRdvCreated}
+        initialRdv={editingRdv || undefined}
         profiles={profiles}
         clients={clients}
         calendarIds={calendarIds}
@@ -779,6 +791,7 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
           open={!!selectedRdv}
           onClose={() => setSelectedRdv(null)}
           onUpdated={handleRdvUpdated}
+          onEdit={handleEditRdv}
           profiles={profiles}
         />
       )}
