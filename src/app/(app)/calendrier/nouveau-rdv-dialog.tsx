@@ -431,7 +431,12 @@ export function NouveauRdvDialog({
   }, [open, loadPreviewEvents]);
 
   // Color map
-  const uniqueCalIds = useMemo(() => [...new Set(googleEvents.map((e) => e.calendarId))], [googleEvents]);
+  const uniqueCalIds = useMemo(() => {
+    const ids = [...new Set(googleEvents.map((e) => e.calendarId))];
+    if (form.unassigned || form.google_calendar.length === 0) return ids;
+    return ids.filter(id => form.google_calendar.includes(id));
+  }, [googleEvents, form.unassigned, form.google_calendar]);
+
   const calColors = useMemo(
     () => Object.fromEntries(calendarIds.map((id, i) => [id, CALENDAR_COLORS[i % CALENDAR_COLORS.length]])),
     [calendarIds]
@@ -439,8 +444,17 @@ export function NouveauRdvDialog({
 
   const previewHours = useMemo(() => Array.from({ length: PREVIEW_TOTAL_HOURS }, (_, i) => PREVIEW_HOUR_START + i), []);
 
-  const dayEvents = useMemo(() => googleEvents.filter((e) => !e.allDay && isSameDay(parseISO(e.start), previewDate)), [googleEvents, previewDate]);
-  const dayRdvs = useMemo(() => rdvs.filter((r) => isSameDay(parseISO(r.start_time), previewDate)), [rdvs, previewDate]);
+  const dayEvents = useMemo(() => googleEvents.filter((e) => {
+    if (e.allDay || !isSameDay(parseISO(e.start), previewDate)) return false;
+    if (form.unassigned || form.google_calendar.length === 0) return true;
+    return form.google_calendar.includes(e.calendarId);
+  }), [googleEvents, previewDate, form.unassigned, form.google_calendar]);
+
+  const dayRdvs = useMemo(() => rdvs.filter((r) => {
+    if (!isSameDay(parseISO(r.start_time), previewDate)) return false;
+    if (form.unassigned || form.assigned_to.length === 0) return true;
+    return r.assigned_to && form.assigned_to.includes(r.assigned_to);
+  }), [rdvs, previewDate, form.unassigned, form.assigned_to]);
 
   function getBlockStyle(startStr: string, endStr: string) {
     const s = parseISO(startStr);
