@@ -42,8 +42,8 @@ function getDefaults() {
   };
 }
 
-const PREVIEW_HOUR_START = 7;
-const PREVIEW_HOUR_END = 21;
+const PREVIEW_HOUR_START = 0;
+const PREVIEW_HOUR_END = 24;
 const PREVIEW_HOUR_HEIGHT = 40;
 const PREVIEW_TOTAL_HOURS = PREVIEW_HOUR_END - PREVIEW_HOUR_START;
 
@@ -279,6 +279,31 @@ export function NouveauRdvDialog({
   });
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll preview to current context
+  useEffect(() => {
+    let timers: NodeJS.Timeout[] = [];
+
+    if (open) {
+      const applyScroll = () => {
+        if (!previewScrollRef.current) return;
+
+        // Force base scroll precisely to 06:00 AM (6 * 40 = 240px)
+        const targetTop = 6 * PREVIEW_HOUR_HEIGHT;
+        previewScrollRef.current.scrollTop = targetTop;
+      };
+
+      // Staggered execution guarantees it applies during and after the dialog's entry animation
+      timers = [
+        setTimeout(applyScroll, 0),
+        setTimeout(applyScroll, 100),
+        setTimeout(applyScroll, 300)
+      ];
+    }
+
+    return () => timers.forEach(clearTimeout);
+  }, [open]);
 
   // Auto-resize notes textarea
   useEffect(() => {
@@ -587,7 +612,7 @@ export function NouveauRdvDialog({
               {/* Assigné à (Horizontal Toggle List) */}
               <div className="space-y-3 min-w-0">
                 <Label className="text-xs font-medium text-slate-400">Assigné à *</Label>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap gap-4">
                   {/* Option "À définir" */}
                   <button
                     key="unassigned"
@@ -879,98 +904,100 @@ export function NouveauRdvDialog({
           </form>
 
           {/* ── Right: Day Preview ── */}
-          <div className="w-[260px] shrink-0 border-l border-slate-700/60 flex flex-col min-h-0">
-            {/* Day nav */}
-            <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700/60 shrink-0 bg-slate-950/30">
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={() => setPreviewDate(addDays(previewDate, -1))}>
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <div className="flex flex-col items-center">
-                <span className="text-[10px] text-slate-500 uppercase tracking-tighter font-semibold">Aperçu</span>
-                <span className="text-[11px] font-bold text-slate-200 capitalize">
-                  {format(previewDate, "EEE d MMM", { locale: fr })}
-                </span>
+          <div className="w-[300px] shrink-0 flex flex-col min-h-0 bg-slate-950/20 p-6 space-y-4">
+            <div className="flex flex-col flex-1 min-h-0 bg-slate-900/50 rounded-2xl border border-slate-700/50 shadow-inner overflow-hidden">
+              {/* Day nav */}
+              <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700/60 shrink-0 bg-slate-950/40">
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={() => setPreviewDate(addDays(previewDate, -1))}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex flex-col items-center">
+                  <span className="text-[10px] text-slate-500 uppercase tracking-tighter font-semibold">Aperçu</span>
+                  <span className="text-[11px] font-bold text-slate-200 capitalize">
+                    {format(previewDate, "EEE d MMM", { locale: fr })}
+                  </span>
+                </div>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={() => setPreviewDate(addDays(previewDate, 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-white" onClick={() => setPreviewDate(addDays(previewDate, 1))}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
 
-            {/* Legend */}
-            {uniqueCalIds.length > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-700/40 shrink-0">
-                {uniqueCalIds.map((id) => (
-                  <div key={id} className="flex items-center gap-1">
-                    <div className={cn("h-1.5 w-1.5 rounded-full", (calColors[id] || CALENDAR_COLORS[0]).text?.replace("text-", "bg-"))} />
-                    <span className="text-[9px] text-slate-500">{getCalendarLabel(id)}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Day grid */}
-            <div className="flex-1 overflow-y-auto scrollbar-hide">
-              <div className="relative">
-                {previewHours.map((h) => (
-                  <div key={h} className="flex border-b border-slate-800/60 group" style={{ height: `${PREVIEW_HOUR_HEIGHT}px` }}>
-                    <div className="w-9 shrink-0 bg-slate-950/20 border-r border-slate-800/40 flex items-start justify-end pr-1.5 pt-0.5">
-                      <span className="text-[9px] text-slate-600 tabular-nums">
-                        {h.toString().padStart(2, "0")}:00
-                      </span>
+              {/* Legend */}
+              {uniqueCalIds.length > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1.5 border-b border-slate-700/40 shrink-0 bg-slate-950/20">
+                  {uniqueCalIds.map((id) => (
+                    <div key={id} className="flex items-center gap-1">
+                      <div className={cn("h-1.5 w-1.5 rounded-full", (calColors[id] || CALENDAR_COLORS[0]).text?.replace("text-", "bg-"))} />
+                      <span className="text-[9px] text-slate-500">{getCalendarLabel(id)}</span>
                     </div>
-                    <div className="flex-1 group-hover:bg-slate-800/10 transition-colors" />
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
 
-                {/* Existing Google events */}
-                {dayEvents.map((event) => {
-                  const style = getBlockStyle(event.start, event.end);
-                  const colors = calColors[event.calendarId] || CALENDAR_COLORS[0];
-                  return (
+              {/* Day grid */}
+              <div ref={previewScrollRef} className="flex-1 overflow-y-auto custom-scrollbar" style={{ maxHeight: `${14 * PREVIEW_HOUR_HEIGHT}px` }}>
+                <div className="relative">
+                  {previewHours.map((h) => (
+                    <div key={h} className="flex border-b border-slate-800/60 group" style={{ height: `${PREVIEW_HOUR_HEIGHT}px` }}>
+                      <div className="w-11 shrink-0 bg-slate-950/20 border-r border-slate-800/40 flex items-start justify-end pr-2 pt-0.5">
+                        <span className="text-[9px] text-slate-600 tabular-nums">
+                          {h.toString().padStart(2, "0")}:00
+                        </span>
+                      </div>
+                      <div className="flex-1 group-hover:bg-slate-800/10 transition-colors" />
+                    </div>
+                  ))}
+
+                  {/* Existing Google events */}
+                  {dayEvents.map((event) => {
+                    const style = getBlockStyle(event.start, event.end);
+                    const colors = calColors[event.calendarId] || CALENDAR_COLORS[0];
+                    return (
+                      <div
+                        key={event.id}
+                        className={cn(
+                          "absolute left-10 right-3 rounded px-1.5 py-0.5 overflow-hidden border-l-2",
+                          colors?.bg, colors?.border
+                        )}
+                        style={style}
+                      >
+                        <p className={cn("text-[10px] font-bold truncate leading-tight", colors?.text)}>{event.title}</p>
+                        <p className="text-[9px] text-slate-500 truncate">
+                          {format(parseISO(event.start), "HH:mm")}–{format(parseISO(event.end), "HH:mm")}
+                        </p>
+                      </div>
+                    );
+                  })}
+
+                  {/* Existing Pipeline RDVs */}
+                  {dayRdvs.map((rdv) => {
+                    const style = getBlockStyle(rdv.start_time, rdv.end_time);
+                    return (
+                      <div
+                        key={rdv.id}
+                        className="absolute left-10 right-3 rounded px-1.5 py-0.5 overflow-hidden border-l-[3px] bg-red-500/25 border-red-500/40 border-l-red-500"
+                        style={style}
+                      >
+                        <p className="text-[10px] font-bold text-white truncate leading-tight">{rdv.title}</p>
+                        <p className="text-[9px] text-white/60 truncate">
+                          {format(parseISO(rdv.start_time), "HH:mm")}–{format(parseISO(rdv.end_time), "HH:mm")}
+                        </p>
+                      </div>
+                    );
+                  })}
+
+                  {/* New RDV overlay */}
+                  {newRdvOverlay && (
                     <div
-                      key={event.id}
-                      className={cn(
-                        "absolute left-8 right-1 rounded px-1.5 py-0.5 overflow-hidden border-l-2",
-                        colors?.bg, colors?.border
-                      )}
-                      style={style}
+                      className="absolute left-10 right-3 rounded px-1.5 py-0.5 overflow-hidden border-l-[3px] bg-red-500/40 border-red-500/60 border-l-red-500 z-10 shadow-lg"
+                      style={newRdvOverlay}
                     >
-                      <p className={cn("text-[10px] font-bold truncate leading-tight", colors?.text)}>{event.title}</p>
-                      <p className="text-[9px] text-slate-500 truncate">
-                        {format(parseISO(event.start), "HH:mm")}–{format(parseISO(event.end), "HH:mm")}
+                      <p className="text-[10px] font-bold text-white truncate leading-tight">
+                        {form.title || "Nouveau RDV"}
                       </p>
                     </div>
-                  );
-                })}
-
-                {/* Existing Pipeline RDVs */}
-                {dayRdvs.map((rdv) => {
-                  const style = getBlockStyle(rdv.start_time, rdv.end_time);
-                  return (
-                    <div
-                      key={rdv.id}
-                      className="absolute left-8 right-1 rounded px-1.5 py-0.5 overflow-hidden border-l-[3px] bg-red-500/25 border-red-500/40 border-l-red-500"
-                      style={style}
-                    >
-                      <p className="text-[10px] font-bold text-white truncate leading-tight">{rdv.title}</p>
-                      <p className="text-[9px] text-white/60 truncate">
-                        {format(parseISO(rdv.start_time), "HH:mm")}–{format(parseISO(rdv.end_time), "HH:mm")}
-                      </p>
-                    </div>
-                  );
-                })}
-
-                {/* New RDV overlay */}
-                {newRdvOverlay && (
-                  <div
-                    className="absolute left-8 right-1 rounded px-1.5 py-0.5 overflow-hidden border-l-[3px] bg-red-500/40 border-red-500/60 border-l-red-500 z-10 shadow-lg"
-                    style={newRdvOverlay}
-                  >
-                    <p className="text-[10px] font-bold text-white truncate leading-tight">
-                      {form.title || "Nouveau RDV"}
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
           </div>
