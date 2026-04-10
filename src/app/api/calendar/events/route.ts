@@ -179,6 +179,35 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
+/**
+ * Shared logic to update a GCal event color
+ */
+export async function updateGoogleEventColor(calendarId: string, eventId: string, colorId: string) {
+  const auth = getGoogleAuth();
+  const client = await auth.getClient();
+  const tokenRes = await client.getAccessToken();
+  const token = typeof tokenRes === "string" ? tokenRes : tokenRes.token;
+
+  const res = await fetch(
+    `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ colorId }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GCal update failed (${res.status}): ${err}`);
+  }
+
+  return await res.json();
+}
+
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -192,31 +221,10 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const auth = getGoogleAuth();
-    const client = await auth.getClient();
-    const tokenRes = await client.getAccessToken();
-    const token = typeof tokenRes === "string" ? tokenRes : tokenRes.token;
-
-    const res = await fetch(
-      `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ colorId }),
-      }
-    );
-
-    if (!res.ok) {
-      const err = await res.text();
-      return NextResponse.json({ error: `GCal update failed: ${err}` }, { status: res.status });
-    }
-
+    await updateGoogleEventColor(calendarId, eventId, colorId);
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Google Calendar PATCH error:", error);
-    return NextResponse.json({ error: "Erreur lors de la mise à jour Google" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Erreur lors de la mise à jour Google" }, { status: 500 });
   }
 }
