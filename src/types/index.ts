@@ -92,6 +92,8 @@ export interface RendezVous {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  google_event_id: string | null;
+  google_calendar_id: string | null;
   // Joined fields
   client?: Client;
   assigned_profile?: Profile;

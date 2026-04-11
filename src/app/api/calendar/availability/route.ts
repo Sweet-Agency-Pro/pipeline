@@ -63,7 +63,6 @@ export async function GET(request: NextRequest) {
       { id: string; title: string; start: string; end: string; location: string | null; allDay: boolean }[]
     > = {};
 
-    console.log(`📅 Calendriers configurés: ${calendarIds.join(", ")}`);
 
     await Promise.all(
       calendarIds.map(async (calId) => {
@@ -85,7 +84,6 @@ export async function GET(request: NextRequest) {
             return;
           }
           const data = await res.json();
-          console.log(`✅ Calendrier ${calId}: ${(data.items || []).length} événement(s) trouvé(s)`);
           events[calId] = (data.items || []).map(
             (event: { id?: string; summary?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; location?: string }) => {
               const allDay = !event.start?.dateTime;

@@ -13,11 +13,11 @@ export default async function CalendrierPage() {
     .select("*")
     .order("full_name");
 
-  // Load clients for the RDV creation form
+  // Load only qualified clients for the RDV creation form
   const { data: clients } = await supabase
     .from("clients")
     .select("id, first_name, last_name, company")
-    .neq("status", "perdu")
+    .in("status", ["qualifie", "proposition", "negociation", "gagne"])
     .order("last_name");
 
   // Google Calendar IDs from env (server-side, not public)

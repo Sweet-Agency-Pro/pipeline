@@ -6,6 +6,14 @@ export const dynamic = "force-dynamic";
 
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 
+// Google Calendar color IDs map
+export const COLOR_MAP = {
+  planifie: "1",  // Light Blue
+  confirme: "10", // Green
+  annule: "11",   // Red
+  termine: "8",   // Grey
+};
+
 function getGoogleAuth() {
   const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
   if (!credentials) {
@@ -33,7 +41,6 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { calendarId, title, start, end, location, description } = body;
 
-  console.log(`📝 POST event: calendar=${calendarId}, title=${title}`);
 
   if (!calendarId || !title || !start || !end) {
     return NextResponse.json(
@@ -64,7 +71,10 @@ export async function POST(request: NextRequest) {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(event),
+        body: JSON.stringify({
+          ...event,
+          colorId: COLOR_MAP.planifie
+        }),
       }
     );
 
@@ -121,7 +131,8 @@ export async function DELETE(request: NextRequest) {
     const tokenRes = await client.getAccessToken();
     const token = typeof tokenRes === "string" ? tokenRes : tokenRes.token;
 
-    // Search for matching event in all calendars
+    // Search and delete matching event in ALL calendars
+    const results = [];
     for (const calId of calendarIds) {
       try {
         const startDate = new Date(start);
@@ -149,16 +160,100 @@ export async function DELETE(request: NextRequest) {
             `${CALENDAR_API}/calendars/${encodeURIComponent(calId)}/events/${match.id}`,
             { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }
           );
-          return NextResponse.json({ deleted: true, calendarId: calId, eventId: match.id });
+          results.push({ calendarId: calId, eventId: match.id });
         }
-      } catch {
+      } catch (err) {
+        console.error(`Error deleting from ${calId}:`, err);
         continue;
       }
     }
 
-    return NextResponse.json({ deleted: false, reason: "no matching event found" });
+    return NextResponse.json({
+      deleted: results.length > 0,
+      count: results.length,
+      details: results
+    });
   } catch (error) {
     console.error("Google Calendar delete error:", error);
     return NextResponse.json({ error: "Erreur lors de la suppression" }, { status: 500 });
+  }
+}
+
+/**
+ * Shared logic to update a GCal event color
+ */
+export async function updateGoogleEventColor(calendarId: string, eventId: string, colorId: string) {
+  const auth = getGoogleAuth();
+  const client = await auth.getClient();
+  const tokenRes = await client.getAccessToken();
+  const token = typeof tokenRes === "string" ? tokenRes : tokenRes.token;
+
+  const res = await fetch(
+    `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ colorId }),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GCal update failed (${res.status}): ${err}`);
+  }
+
+  return await res.json();
+}
+
+export async function PATCH(request: NextRequest) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+
+  const body = await request.json();
+  const { calendarId, eventId, colorId, title, start, end, location, description } = body;
+
+  if (!calendarId || !eventId) {
+    return NextResponse.json({ error: "calendarId et eventId requis" }, { status: 400 });
+  }
+
+  try {
+    const auth = getGoogleAuth();
+    const client = await auth.getClient();
+    const tokenRes = await client.getAccessToken();
+    const token = typeof tokenRes === "string" ? tokenRes : tokenRes.token;
+
+    const patchBody: any = {};
+    if (colorId) patchBody.colorId = colorId;
+    if (title) patchBody.summary = title;
+    if (start) patchBody.start = { dateTime: start, timeZone: "Europe/Paris" };
+    if (end) patchBody.end = { dateTime: end, timeZone: "Europe/Paris" };
+    if (location !== undefined) patchBody.location = location;
+    if (description !== undefined) patchBody.description = description;
+
+    const res = await fetch(
+      `${CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`,
+      {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(patchBody),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      return NextResponse.json({ error: `GCal update failed: ${err}` }, { status: res.status });
+    }
+
+    return NextResponse.json({ success: true, data: await res.json() });
+  } catch (error: any) {
+    console.error("Google Calendar PATCH error:", error);
+    return NextResponse.json({ error: error.message || "Erreur lors de la mise à jour Google" }, { status: 500 });
   }
 }
