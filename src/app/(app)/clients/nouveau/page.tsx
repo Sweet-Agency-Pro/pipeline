@@ -231,23 +231,21 @@ function NewClientContent() {
           <form onSubmit={handleSubmit} key={prospect?.id ?? "new"} className="space-y-6">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="first_name">Prénom *</Label>
+                <Label htmlFor="first_name">Prénom</Label>
                 <Input
                   id="first_name"
                   name="first_name"
                   placeholder="Jean"
                   defaultValue={prospect?.first_name ?? ""}
-                  required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="last_name">Nom *</Label>
+                <Label htmlFor="last_name">Nom</Label>
                 <Input
                   id="last_name"
                   name="last_name"
                   placeholder="Dupont"
                   defaultValue={prospect?.last_name ?? ""}
-                  required
                 />
               </div>
             </div>
