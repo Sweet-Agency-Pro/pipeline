@@ -198,6 +198,7 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
   const [currentDate, setCurrentDate] = useState(new Date());
   const [miniCalDate, setMiniCalDate] = useState(new Date());
   const [rdvs, setRdvs] = useState<RendezVous[]>([]);
+  const [upcomingRdvs, setUpcomingRdvs] = useState<RendezVous[]>([]);
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewRdv, setShowNewRdv] = useState(false);
@@ -236,6 +237,18 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
     if (data) setRdvs(data as RendezVous[]);
   }, [supabase, weekStart, weekEnd]);
 
+  const loadUpcomingRdvs = useCallback(async () => {
+    const now = new Date().toISOString();
+
+    const { data } = await supabase
+      .from("rendez_vous")
+      .select("*, client:clients(id, first_name, last_name, company), assigned_profile:profiles!rendez_vous_assigned_to_fkey(*)")
+      .gte("start_time", now)
+      .order("start_time", { ascending: true });
+    
+    if (data) setUpcomingRdvs(data as RendezVous[]);
+  }, [supabase]);
+
   const loadGoogleEvents = useCallback(async () => {
     setLoading(true);
     try {
@@ -261,8 +274,9 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
 
   useEffect(() => {
     loadRdvs();
+    loadUpcomingRdvs();
     loadGoogleEvents();
-  }, [loadRdvs, loadGoogleEvents]);
+  }, [loadRdvs, loadUpcomingRdvs, loadGoogleEvents]);
 
   // Navigation
   const goToday = () => setCurrentDate(new Date());
@@ -271,8 +285,8 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
   const isCurrentWeek = isSameDay(weekStart, startOfWeek(new Date(), { weekStartsOn: 1 }));
 
   // Callbacks
-  const handleRdvCreated = () => { setShowNewRdv(false); setEditingRdv(null); loadRdvs(); };
-  const handleRdvUpdated = () => { setSelectedRdv(null); setEditingRdv(null); loadRdvs(); };
+  const handleRdvCreated = () => { setShowNewRdv(false); setEditingRdv(null); loadRdvs(); loadUpcomingRdvs(); };
+  const handleRdvUpdated = () => { setSelectedRdv(null); setEditingRdv(null); loadRdvs(); loadUpcomingRdvs(); };
 
   const handleEditRdv = (rdv: RendezVous) => {
     setSelectedRdv(null);
@@ -474,11 +488,11 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
                   expandedUpcoming ? "max-h-[800px] opacity-100 translate-y-0" : "max-h-0 opacity-0 -translate-y-4 pointer-events-none"
                 )}
               >
-                {rdvs.length === 0 ? (
-                  <div className="pl-1 text-sm text-slate-500 italic mt-1 pb-2">Aucun RDV</div>
+                {upcomingRdvs.length === 0 ? (
+                  <div className="pl-1 text-sm text-slate-500 italic mt-1 pb-2">Aucun RDV à venir</div>
                 ) : (
                   <div className="space-y-0.5 pb-2">
-                    {rdvs.map((rdv) => (
+                    {upcomingRdvs.map((rdv) => (
                       <div key={rdv.id} onClick={() => setSelectedRdv(rdv)} className="cursor-pointer flex flex-col gap-0.5 text-xs text-slate-400 hover:bg-slate-800/60 p-1.5 -mx-1.5 rounded transition-colors group">
                         <div className="flex items-center justify-between">
                           <span className="font-medium text-teal-400 truncate pr-2">{rdv.title}</span>
@@ -495,6 +509,7 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
                               } catch { }
                               await supabase.from("rendez_vous").delete().eq("id", rdv.id);
                               loadRdvs();
+                              loadUpcomingRdvs();
                             }}
                             className="opacity-0 group-hover:opacity-100 h-4 w-4 flex items-center justify-center rounded text-slate-500 hover:text-red-400 transition-all shrink-0"
                             title="Supprimer"
