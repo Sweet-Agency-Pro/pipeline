@@ -17,6 +17,9 @@ export async function POST(request: NextRequest) {
   const dayStart = startOfDay(tomorrow).toISOString();
   const dayEnd = endOfDay(tomorrow).toISOString();
 
+  console.log("Reminders Range - Start:", dayStart);
+  console.log("Reminders Range - End:", dayEnd);
+
   // 3. Récupérer les rendez-vous de demain qui n'ont pas encore eu de rappel
   const { data: rdvs, error } = await supabase
     .from("rendez_vous")
