@@ -599,7 +599,7 @@ export function NouveauRdvDialog({
             .order("created_at", { ascending: false })
             .limit(1)
             .single();
-          
+
           if (latest) {
             await supabase
               .from("rendez_vous")
@@ -613,7 +613,7 @@ export function NouveauRdvDialog({
     // --- Common actions for both New and Update ---
     if (!error && !form.unassigned) {
       const emailToUse = clientEmail.trim();
-      
+
       // Update client email if entered manually
       if (form.client_id && emailToUse && !clientHasEmail) {
         await supabase
@@ -623,35 +623,51 @@ export function NouveauRdvDialog({
       }
 
       // Send Email Notification
-      if (form.client_id && emailToUse) {
-        try {
-          const { data: clientData } = await supabase
-            .from("clients")
-            .select("first_name, last_name")
-            .eq("id", form.client_id)
-            .single();
-          
-          if (clientData) {
-            const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
-            await fetch("/api/email/rdv-confirmation", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                clientEmail: emailToUse,
-                clientName: `${clientData.first_name} ${clientData.last_name}`,
-                title: form.title,
-                start: startISO,
-                end: endISO,
-                location: form.location || undefined,
-                description: form.description || undefined,
-                assignedName: assignedProfile?.full_name || undefined,
-                isUpdate: !!initialRdv,
-              }),
-            });
+      try {
+        const { data: clientData } = await supabase
+          .from("clients")
+          .select("first_name, last_name, email")
+          .eq("id", form.client_id)
+          .single();
+
+        const finalEmail = emailToUse || clientData?.email;
+
+        if (clientData && finalEmail) {
+          // Si c'est une modification, on vérifie si les informations clés ont changé
+          if (initialRdv) {
+            const hasTimeChanged =
+              new Date(initialRdv.start_time).getTime() !== new Date(startISO).getTime() ||
+              new Date(initialRdv.end_time).getTime() !== new Date(endISO).getTime();
+
+            const hasLocationChanged = (initialRdv.location || "") !== (form.location || "");
+
+            // On n'envoie PAS de mail si ni l'heure ni le lieu n'ont changé
+            if (!hasTimeChanged && !hasLocationChanged) {
+              setLoading(false);
+              onCreated();
+              return;
+            }
           }
-        } catch (err) {
-          console.error("Email notification failed:", err);
+
+          const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
+          await fetch("/api/email/rdv-confirmation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              clientEmail: finalEmail,
+              clientName: `${clientData.first_name} ${clientData.last_name}`,
+              title: form.title,
+              start: startISO,
+              end: endISO,
+              location: form.location || undefined,
+              description: form.description || undefined,
+              assignedName: assignedProfile?.full_name || undefined,
+              isUpdate: !!initialRdv,
+            }),
+          });
         }
+      } catch (err) {
+        console.error("Email notification failed:", err);
       }
     }
 
