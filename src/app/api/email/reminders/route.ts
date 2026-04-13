@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 import { sendRdvEmail } from "@/lib/email-service";
 import { startOfDay, endOfDay, addDays } from "date-fns";
 
@@ -10,15 +10,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
-  const supabase = await createClient();
+  // Utilisation de la SERVICE_ROLE_KEY pour bypasser la RLS (indispensable pour les Cron Jobs)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   // 2. Définir la plage horaire pour demain (J+1)
   const tomorrow = addDays(new Date(), 1);
   const dayStart = startOfDay(tomorrow).toISOString();
   const dayEnd = endOfDay(tomorrow).toISOString();
-
-  console.log("Reminders Range - Start:", dayStart);
-  console.log("Reminders Range - End:", dayEnd);
 
   // 3. Récupérer les rendez-vous de demain qui n'ont pas encore eu de rappel
   const { data: rdvs, error } = await supabase
