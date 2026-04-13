@@ -161,8 +161,11 @@ export function buildHtml({
         <p style="margin: 0 0 12px; color: #64748b; font-size: 13px; font-weight: 500;">📅 Ajouter à mon agenda</p>
         <div style="text-align: center;">
           <a href="${getGoogleCalendarUrl({ title, start: rawStart, end: rawEnd, location, description })}" 
-             style="display: inline-block; padding: 10px 18px; background-color: #ffffff; color: #3c4043; border: 1px solid #dadce0; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin: 4px;"
-             target="_blank">Google Calendar</a>
+             style="display: inline-flex; align-items: center; padding: 10px 18px; background-color: #ffffff; color: #3c4043; border: 1px solid #dadce0; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin: 4px;"
+             target="_blank">
+             <img src="https://www.gstatic.com/calendar/images/dynamiclogo_2020q4/calendar_31_2x.png" width="18" height="18" style="margin-right: 8px; display: inline-block; vertical-align: middle;" alt="">
+             Google Calendar
+          </a>
         </div>
       </div>
       <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;line-height:1.5;">
