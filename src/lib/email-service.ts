@@ -118,6 +118,7 @@ export function buildHtml({
     
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#0d9488,#06b6d4);padding:32px 28px;text-align:center;">
+      <img src="https://agence-sweet.com/sweet_logo.png" alt="Agence Sweet" style="height:60px;margin-bottom:8px;display:inline-block;">
       <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;">${headerTitle}</h1>
       <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Agence Sweet</p>
     </div>
@@ -170,8 +171,8 @@ export function buildHtml({
       </div>
       <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;line-height:1.5;">
         ${isUpdate
-          ? "Si cette modification ne fait pas suite à votre demande ou si ce nouveau créneau ne vous convient pas, n'hésitez pas à nous contacter en répondant à cet email."
-          : "En cas d'empêchement, merci de nous prévenir le plus tôt possible en répondant à cet email."}
+      ? "Si cette modification ne fait pas suite à votre demande ou si ce nouveau créneau ne vous convient pas, n'hésitez pas à nous contacter en répondant à cet email."
+      : "En cas d'empêchement, merci de nous prévenir le plus tôt possible en répondant à cet email."}
       </p>
       `}
     </div>
