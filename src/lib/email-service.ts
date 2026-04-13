@@ -34,6 +34,21 @@ function isValidUrl(str: string): boolean {
   }
 }
 
+function formatCalendarDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+}
+
+function getGoogleCalendarUrl({ title, start, end, location, description }: { title: string, start: string, end: string, location: string | null, description: string | null }) {
+  const base = "https://www.google.com/calendar/render?action=TEMPLATE";
+  const params = new URLSearchParams({
+    text: title,
+    dates: `${formatCalendarDate(start)}/${formatCalendarDate(end)}`,
+    location: location || "",
+  });
+  return `${base}&${params.toString()}`;
+}
+
 export interface EmailParams {
   clientEmail: string;
   clientFirstName?: string;
@@ -58,6 +73,8 @@ export function buildHtml({
   isReminder,
   clientFirstName = "Client",
   assignedName = "notre équipe",
+  rawStart,
+  rawEnd,
 }: {
   title: string;
   date: string;
@@ -69,6 +86,8 @@ export function buildHtml({
   isReminder?: boolean;
   clientFirstName?: string;
   assignedName?: string;
+  rawStart: string;
+  rawEnd: string;
 }) {
   const locationIsLink = location && isValidUrl(location);
   const locationHtml = location
@@ -138,10 +157,18 @@ export function buildHtml({
         Nous avons hâte de vous rencontrer !
       </p>
       ` : `
+      <div style="margin: 24px 0; padding-top: 24px; border-top: 1px solid #e2e8f0; text-align: center;">
+        <p style="margin: 0 0 12px; color: #64748b; font-size: 13px; font-weight: 500;">📅 Ajouter à mon agenda</p>
+        <div style="text-align: center;">
+          <a href="${getGoogleCalendarUrl({ title, start: rawStart, end: rawEnd, location, description })}" 
+             style="display: inline-block; padding: 10px 18px; background-color: #ffffff; color: #3c4043; border: 1px solid #dadce0; border-radius: 8px; font-size: 13px; font-weight: 600; text-decoration: none; margin: 4px;"
+             target="_blank">Google Calendar</a>
+        </div>
+      </div>
       <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;line-height:1.5;">
         ${isUpdate
-      ? "Si cette modification ne fait pas suite à votre demande ou si ce nouveau créneau ne vous convient pas, n'hésitez pas à nous contacter en répondant à cet email."
-      : "En cas d'empêchement, merci de nous prévenir le plus tôt possible en répondant à cet email."}
+          ? "Si cette modification ne fait pas suite à votre demande ou si ce nouveau créneau ne vous convient pas, n'hésitez pas à nous contacter en répondant à cet email."
+          : "En cas d'empêchement, merci de nous prévenir le plus tôt possible en répondant à cet email."}
       </p>
       `}
     </div>
@@ -200,6 +227,8 @@ export async function sendRdvEmail({
       isReminder,
       clientFirstName,
       assignedName,
+      rawStart: start,
+      rawEnd: end,
     }),
   });
 }
