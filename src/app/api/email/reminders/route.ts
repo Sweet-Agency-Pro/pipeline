@@ -10,6 +10,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   }
 
+  // Log d'activation
+  console.log(`Rappels cron activé à ${new Date().toISOString()}`);
+  const startTime = Date.now();
+
   // Utilisation de la SERVICE_ROLE_KEY pour bypasser la RLS (indispensable pour les Cron Jobs)
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,23 +49,38 @@ export async function POST(request: NextRequest) {
   }
 
   if (!rdvs || rdvs.length === 0) {
+    console.log("Aucun RDV trouvé pour demain.");
+    return NextResponse.json({ message: "Aucun rappel à envoyer pour demain" });
+  }
+
+  // Calculer le nombre de clients réellement notifiables (avec email)
+  // @ts-ignore
+  const clientsToSend = rdvs.filter((r: any) => r.clients && r.clients.email);
+  const clientsCount = clientsToSend.length;
+  console.log(`RDVs trouvés: ${rdvs.length}. Clients avec email: ${clientsCount}`);
+
+  if (clientsCount === 0) {
+    console.log("Aucun client avec email à notifier pour demain.");
     return NextResponse.json({ message: "Aucun rappel à envoyer pour demain" });
   }
 
   const results = {
-    total: rdvs.length,
+    total: clientsCount,
     sent: 0,
     errors: 0,
   };
 
   // 4. Envoyer les emails
-  for (const rdv of rdvs) {
+  for (const rdv of clientsToSend) {
     const client = rdv.clients;
     if (!client || !client.email) continue;
 
     try {
       // @ts-ignore - Handle profile being an object or array depending on PostgREST config
       const assignee = Array.isArray(rdv.profiles) ? rdv.profiles[0] : rdv.profiles;
+
+      // Log avant envoi avec infos client
+      console.log(`Envoi rappel RDV ${rdv.id} -> ${client.email} (${client.first_name || ''} ${client.last_name || ''}) prévu ${rdv.start_time}`);
 
       await sendRdvEmail({
         clientEmail: client.email,
@@ -75,6 +94,9 @@ export async function POST(request: NextRequest) {
         isReminder: true,
       });
 
+      // Log succès pour cet envoi
+      console.log(`Rappel envoyé pour RDV ${rdv.id} à ${client.email}`);
+
       // 5. Marquer comme envoyé
       await supabase
         .from("rendez_vous")
@@ -83,13 +105,17 @@ export async function POST(request: NextRequest) {
 
       results.sent++;
     } catch (err) {
-      console.error(`Failed to send reminder for RDV ${rdv.id}:`, err);
+      console.error(`Failed to send reminder for RDV ${rdv.id} -> ${client?.email || 'no-email'}:`, err);
       results.errors++;
     }
   }
 
+  const elapsedMs = Date.now() - startTime;
+  console.log(`Rappels cron terminé — Durée: ${elapsedMs}ms. Total: ${results.total}, Envoyés: ${results.sent}, Erreurs: ${results.errors}`);
+
   return NextResponse.json({ 
     message: "Traitement des rappels terminé",
-    results 
+    results,
+    elapsedMs
   });
 }
