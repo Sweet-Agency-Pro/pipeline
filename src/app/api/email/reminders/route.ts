@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendRdvEmail } from "@/lib/email-service";
+import { insertEmailLog, toErrorMessage } from "@/lib/email-logs";
 import { startOfDay, endOfDay, addDays } from "date-fns";
 
 export async function POST(request: NextRequest) {
@@ -68,6 +69,13 @@ export async function POST(request: NextRequest) {
     total: clientsCount,
     sent: 0,
     errors: 0,
+    details: [] as Array<{
+      rdvId: string;
+      recipient: string;
+      status: "sent" | "failed";
+      messageId: string | null;
+      error: string | null;
+    }>,
   };
 
   // 4. Envoyer les emails
@@ -82,7 +90,7 @@ export async function POST(request: NextRequest) {
       // Log avant envoi avec infos client
       console.log(`Envoi rappel RDV ${rdv.id} -> ${client.email} (${client.first_name || ''} ${client.last_name || ''}) prévu ${rdv.start_time}`);
 
-      await sendRdvEmail({
+      const delivery = await sendRdvEmail({
         clientEmail: client.email,
         clientFirstName: client.first_name || "Client",
         assignedName: assignee?.full_name || "l'équipe Sweet",
@@ -95,7 +103,26 @@ export async function POST(request: NextRequest) {
       });
 
       // Log succès pour cet envoi
-      console.log(`Rappel envoyé pour RDV ${rdv.id} à ${client.email}`);
+      console.log(`Rappel envoyé pour RDV ${rdv.id} à ${client.email} (messageId=${delivery.messageId})`);
+
+      await insertEmailLog(supabase, {
+        emailType: "reminder",
+        status: "sent",
+        recipient: client.email,
+        subject: `Rappel : Votre rendez-vous de demain - ${rdv.title}`,
+        rdvId: rdv.id,
+        source: "cron",
+        messageId: delivery.messageId,
+        providerResponse: delivery.response,
+        accepted: delivery.accepted,
+        rejected: delivery.rejected,
+        metadata: {
+          start: rdv.start_time,
+          end: rdv.end_time,
+          location: rdv.location || null,
+          title: rdv.title,
+        },
+      });
 
       // 5. Marquer comme envoyé
       await supabase
@@ -104,9 +131,40 @@ export async function POST(request: NextRequest) {
         .eq("id", rdv.id);
 
       results.sent++;
+      results.details.push({
+        rdvId: rdv.id,
+        recipient: client.email,
+        status: "sent",
+        messageId: delivery.messageId,
+        error: null,
+      });
     } catch (err) {
       console.error(`Failed to send reminder for RDV ${rdv.id} -> ${client?.email || 'no-email'}:`, err);
+
+      await insertEmailLog(supabase, {
+        emailType: "reminder",
+        status: "failed",
+        recipient: client?.email || "unknown",
+        subject: `Rappel : Votre rendez-vous de demain - ${rdv.title}`,
+        rdvId: rdv.id,
+        source: "cron",
+        errorMessage: toErrorMessage(err),
+        metadata: {
+          start: rdv.start_time,
+          end: rdv.end_time,
+          location: rdv.location || null,
+          title: rdv.title,
+        },
+      });
+
       results.errors++;
+      results.details.push({
+        rdvId: rdv.id,
+        recipient: client?.email || "unknown",
+        status: "failed",
+        messageId: null,
+        error: toErrorMessage(err),
+      });
     }
   }
 

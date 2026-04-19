@@ -62,6 +62,26 @@ export interface EmailParams {
   isReminder?: boolean;
 }
 
+export interface EmailDeliveryResult {
+  messageId: string;
+  accepted: string[];
+  rejected: string[];
+  response: string;
+}
+
+function normalizeAddressEntries(entries: unknown[] = []): string[] {
+  return entries
+    .map((entry) => {
+      if (typeof entry === "string") return entry;
+      if (entry && typeof entry === "object" && "address" in entry) {
+        const value = (entry as { address?: unknown }).address;
+        return typeof value === "string" ? value : null;
+      }
+      return null;
+    })
+    .filter((entry): entry is string => Boolean(entry));
+}
+
 export function buildHtml({
   title,
   date,
@@ -216,7 +236,7 @@ export async function sendRdvEmail({
     subject = `Modification de rendez-vous - ${title}`;
   }
 
-  return transporter.sendMail({
+  const info = await transporter.sendMail({
     from: `"${fromName}" <${fromEmail}>`,
     to: clientEmail,
     subject,
@@ -235,4 +255,11 @@ export async function sendRdvEmail({
       rawEnd: end,
     }),
   });
+
+  return {
+    messageId: info.messageId,
+    accepted: normalizeAddressEntries((info.accepted as unknown[]) || []),
+    rejected: normalizeAddressEntries((info.rejected as unknown[]) || []),
+    response: info.response,
+  } satisfies EmailDeliveryResult;
 }

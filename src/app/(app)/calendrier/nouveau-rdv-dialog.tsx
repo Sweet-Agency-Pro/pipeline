@@ -505,6 +505,7 @@ export function NouveauRdvDialog({
     const endISO = new Date(form.end_time).toISOString();
 
     let error = null;
+    let savedRdvId: string | null = initialRdv?.id || null;
 
     if (initialRdv) {
       // Logic: if it was "termine" but moved to the future, reset to "planifie"
@@ -550,17 +551,22 @@ export function NouveauRdvDialog({
         }
       }
     } else {
-      const { error: err } = await supabase.from("rendez_vous").insert({
-        title: form.title,
-        client_id: form.client_id || null,
-        assigned_to: form.unassigned ? null : (form.assigned_to[0] || null), // Null if unassigned
-        start_time: startISO,
-        end_time: endISO,
-        location: form.location || null,
-        description: form.description || null,
-        created_by: user?.id,
-      });
+      const { data: insertedRdv, error: err } = await supabase
+        .from("rendez_vous")
+        .insert({
+          title: form.title,
+          client_id: form.client_id || null,
+          assigned_to: form.unassigned ? null : (form.assigned_to[0] || null), // Null if unassigned
+          start_time: startISO,
+          end_time: endISO,
+          location: form.location || null,
+          description: form.description || null,
+          created_by: user?.id,
+        })
+        .select("id")
+        .single();
       error = err;
+      savedRdvId = insertedRdv?.id || null;
 
       // Google Calendar Creation (only for new RDVs)
       if (!error && !form.unassigned) {
@@ -591,21 +597,11 @@ export function NouveauRdvDialog({
           } catch { /* Silent fail */ }
         }));
 
-        if (savedEventId) {
-          const { data: latest } = await supabase
+        if (savedEventId && savedRdvId) {
+          await supabase
             .from("rendez_vous")
-            .select("id")
-            .eq("created_by", user?.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .single();
-
-          if (latest) {
-            await supabase
-              .from("rendez_vous")
-              .update({ google_event_id: savedEventId, google_calendar_id: savedCalId })
-              .eq("id", latest.id);
-          }
+            .update({ google_event_id: savedEventId, google_calendar_id: savedCalId })
+            .eq("id", savedRdvId);
         }
       }
     }
@@ -650,10 +646,11 @@ export function NouveauRdvDialog({
           }
 
           const assignedProfile = profiles.find((p) => p.id === form.assigned_to[0]);
-          await fetch("/api/email/rdv-confirmation", {
+          const emailResponse = await fetch("/api/email/rdv-confirmation", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              rdvId: savedRdvId,
               clientEmail: finalEmail,
               clientName: `${clientData.first_name} ${clientData.last_name}`,
               title: form.title,
@@ -665,6 +662,14 @@ export function NouveauRdvDialog({
               isUpdate: !!initialRdv,
             }),
           });
+
+          if (!emailResponse.ok) {
+            const errorPayload = await emailResponse.json().catch(() => ({}));
+            console.error("Email API returned an error:", errorPayload);
+          } else {
+            const successPayload = await emailResponse.json().catch(() => ({}));
+            console.info("Email envoyé avec succès:", successPayload);
+          }
         }
       } catch (err) {
         console.error("Email notification failed:", err);
