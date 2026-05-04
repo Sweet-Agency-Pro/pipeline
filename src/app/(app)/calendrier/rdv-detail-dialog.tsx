@@ -1,5 +1,6 @@
 "use client";
 
+import type { ElementType, ReactNode } from "react";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -23,12 +24,17 @@ import {
   FileText,
   Edit2,
   X,
+  ExternalLink,
+  Video,
+  FileAudio,
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import type { Profile, RendezVous, RdvStatus } from "@/types";
 import { RDV_STATUS_CONFIG } from "@/types";
 import { cn } from "@/lib/utils";
+import { useActivityLog } from "@/hooks/use-activity-log";
+import { MeetingRetourDialog } from "./meeting-retour-dialog";
 
 interface RdvDetailDialogProps {
   rdv: RendezVous;
@@ -39,6 +45,15 @@ interface RdvDetailDialogProps {
   profiles: Profile[];
 }
 
+function InfoRow({ icon: Icon, children }: { icon: ElementType; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 text-sm text-slate-300">
+      <Icon className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
+      <div className="break-words min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
 export function RdvDetailDialog({
   rdv,
   open,
@@ -47,14 +62,21 @@ export function RdvDetailDialog({
   onEdit,
 }: RdvDetailDialogProps) {
   const supabase = createClient();
+  const { log } = useActivityLog();
   const [loading, setLoading] = useState(false);
+  const [showRetour, setShowRetour] = useState(false);
 
   const conf = RDV_STATUS_CONFIG[rdv.status as RdvStatus];
   const clientName = rdv.client ? `${rdv.client.first_name} ${rdv.client.last_name}` : null;
 
   async function updateStatus(status: RdvStatus) {
     setLoading(true);
-    await supabase.from("rendez_vous").update({ status }).eq("id", rdv.id);
+    const { error } = await supabase.from("rendez_vous").update({ status }).eq("id", rdv.id);
+
+    if (error) {
+      setLoading(false);
+      return;
+    }
 
     // Sync with Google Calendar if possible
     if (rdv.google_event_id && rdv.google_calendar_id) {
@@ -79,6 +101,15 @@ export function RdvDetailDialog({
         console.error("GCal sync failed:", err);
       }
     }
+
+    const nextStatusLabel = RDV_STATUS_CONFIG[status].label.toLowerCase();
+    await log(
+      status === "annule"
+        ? `a annulé le rendez-vous "${rdv.title}"`
+        : `a changé le statut du rendez-vous "${rdv.title}" en ${nextStatusLabel}`,
+      "rendez_vous",
+      rdv.id
+    );
 
     setLoading(false);
     onUpdated();
@@ -107,21 +138,18 @@ export function RdvDetailDialog({
         });
       }
     } catch { }
-    await supabase.from("rendez_vous").delete().eq("id", rdv.id);
+    const { error } = await supabase.from("rendez_vous").delete().eq("id", rdv.id);
+    if (!error) {
+      await log(`a supprimé le rendez-vous "${rdv.title}"`, "rendez_vous", rdv.id);
+    }
     setLoading(false);
     onUpdated();
   }
 
-  const InfoRow = ({ icon: Icon, children }: { icon: React.ElementType; children: React.ReactNode }) => (
-    <div className="flex items-center gap-3 text-sm text-slate-300">
-      <Icon className="h-4 w-4 text-slate-500 shrink-0" />
-      <span>{children}</span>
-    </div>
-  );
-
   return (
+    <>
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent showCloseButton={false} className="bg-slate-900 border-slate-700/60 text-slate-200 sm:max-w-md p-0 gap-0 overflow-hidden">
+      <DialogContent showCloseButton={false} className="bg-slate-900 border-slate-700/60 text-slate-200 sm:max-w-lg p-0 gap-0 overflow-hidden">
         {/* Top actions group */}
         <div className="absolute top-2 right-2 flex gap-1 z-50">
           <Button
@@ -148,11 +176,11 @@ export function RdvDetailDialog({
         {/* Header with accent */}
         <div className="border-b border-slate-800 px-6 pt-6 pb-4">
           <DialogHeader>
-            <div className="flex items-start justify-between gap-3">
-              <DialogTitle className="text-lg font-semibold text-white leading-tight">
+            <div className="space-y-2">
+              <DialogTitle className="text-lg font-semibold text-white leading-tight break-words pr-20">
                 {rdv.title}
               </DialogTitle>
-              <Badge className={cn("text-[11px] px-2 py-0.5 shrink-0 border-0", conf.bgColor, conf.color)}>
+              <Badge className={cn("text-[11px] px-2 py-0.5 w-fit border-0", conf.bgColor, conf.color)}>
                 {conf.label}
               </Badge>
             </div>
@@ -183,9 +211,29 @@ export function RdvDetailDialog({
             </InfoRow>
           )}
 
-          {rdv.location && (
-            <InfoRow icon={MapPin}>{rdv.location}</InfoRow>
-          )}
+          {rdv.location && (() => {
+            const isUrl = rdv.location.startsWith("http");
+            const Icon = isUrl ? Video : MapPin;
+            const label = isUrl ? "Lien vers la visio" : rdv.location;
+            return (
+              <div className="flex items-start gap-3 text-sm text-slate-300">
+                <Icon className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
+                {isUrl ? (
+                  <a
+                    href={rdv.location}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-teal-400 hover:text-teal-300 hover:underline transition-colors font-medium"
+                  >
+                    {label}
+                    <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                  </a>
+                ) : (
+                  <span className="break-words min-w-0">{rdv.location}</span>
+                )}
+              </div>
+            );
+          })()}
 
           {rdv.description && (
             <div className="flex gap-3 text-sm">
@@ -198,6 +246,16 @@ export function RdvDetailDialog({
         {/* Actions */}
         <div className="border-t border-slate-800 px-6 py-4 flex items-center justify-between">
           <div className="flex gap-1.5 overflow-x-auto">
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={loading}
+              onClick={() => setShowRetour(true)}
+              className="h-8 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 shrink-0"
+            >
+              <FileAudio className="mr-1.5 h-3.5 w-3.5" />
+              Retour RDV
+            </Button>
             {rdv.status !== "confirme" && (
               <Button
                 size="sm"
@@ -248,5 +306,13 @@ export function RdvDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Retour RDV dialog */}
+    <MeetingRetourDialog
+      rdv={rdv}
+      open={showRetour}
+      onClose={() => setShowRetour(false)}
+    />
+  </>
   );
 }

@@ -10,12 +10,13 @@ import {
 } from "lucide-react";
 import {
   CLIENT_STATUS_CONFIG,
-  type ClientStatus,
   type ActivityLog,
   type Profile,
 } from "@/types";
 import { formatCurrency, formatRelativeDate } from "@/lib/utils";
 import Link from "next/link";
+import { computeDashboardMetrics } from "@/lib/dashboard-metrics";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -44,36 +45,21 @@ async function getDashboardData() {
 export default async function DashboardPage() {
   const { clients, projects, activities } = await getDashboardData();
 
-  const totalClients = clients.length;
-  const activeProjects = projects.filter((p) => p.status === "en_cours").length;
-  const totalPipeline = clients
-    .filter((c) => !["gagne", "perdu"].includes(c.status))
-    .reduce((sum: number, c: { estimated_amount: number }) => sum + (c.estimated_amount || 0), 0);
-  const wonCount = clients.filter((c) => c.status === "gagne").length;
-  const lostCount = clients.filter((c) => c.status === "perdu").length;
-  const totalClosed = wonCount + lostCount;
-  const conversionRate = totalClosed > 0 ? (wonCount / totalClosed) * 100 : 0;
-  const wonAmount = clients
-    .filter((c) => c.status === "gagne")
-    .reduce((sum: number, c: { estimated_amount: number }) => sum + (c.estimated_amount || 0), 0);
-
-  // Count clients per status for pipeline
-  const statusCounts = (
-    Object.keys(CLIENT_STATUS_CONFIG) as ClientStatus[]
-  ).map((status) => ({
-    status,
-    ...CLIENT_STATUS_CONFIG[status],
-    count: clients.filter((c) => c.status === status).length,
-  }));
+  const {
+    totalClients,
+    activeProjects,
+    totalPipeline,
+    conversionRate,
+    wonAmount,
+    statusCounts,
+  } = computeDashboardMetrics(clients, projects);
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Dashboard</h1>
-        <p className="text-slate-400">
-          Vue d&apos;ensemble de votre activité commerciale
-        </p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Vue d'ensemble de votre activité commerciale"
+      />
 
       {/* Stats Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -149,9 +135,7 @@ export default async function DashboardPage() {
                       <div className="h-2 rounded-full bg-slate-700 overflow-hidden">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-500"
-                          style={{
-                            width: `${totalClients > 0 ? (s.count / totalClients) * 100 : 0}%`,
-                          }}
+                          style={{ width: `${s.ratio}%` }}
                         />
                       </div>
                     </div>

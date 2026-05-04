@@ -1,8 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { sendRdvEmail } from "@/lib/email-service";
 import { insertEmailLog, toErrorMessage } from "@/lib/email-logs";
 import { startOfDay, endOfDay, addDays } from "date-fns";
+import { getServiceRoleClient } from "@/lib/supabase/admin";
+
+interface ReminderClient {
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+}
+
+interface ReminderProfile {
+  full_name: string | null;
+}
+
+interface ReminderRdv {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  location: string | null;
+  description: string | null;
+  clients: ReminderClient | null;
+  profiles: ReminderProfile | ReminderProfile[] | null;
+}
+
+function getAssignee(profile: ReminderRdv["profiles"]): ReminderProfile | null {
+  if (!profile) {
+    return null;
+  }
+
+  return Array.isArray(profile) ? (profile[0] ?? null) : profile;
+}
 
 export async function POST(request: NextRequest) {
   // 1. Protection par secret
@@ -15,11 +44,8 @@ export async function POST(request: NextRequest) {
   console.log(`Rappels cron activé à ${new Date().toISOString()}`);
   const startTime = Date.now();
 
-  // Utilisation de la SERVICE_ROLE_KEY pour bypasser la RLS (indispensable pour les Cron Jobs)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // Service role nécessaire pour bypasser la RLS sur les traitements Cron.
+  const supabase = getServiceRoleClient();
 
   // 2. Définir la plage horaire pour demain (J+1)
   const tomorrow = addDays(new Date(), 1);
@@ -27,7 +53,7 @@ export async function POST(request: NextRequest) {
   const dayEnd = endOfDay(tomorrow).toISOString();
 
   // 3. Récupérer les rendez-vous de demain qui n'ont pas encore eu de rappel
-  const { data: rdvs, error } = await supabase
+  const { data: rdvsData, error } = await supabase
     .from("rendez_vous")
     .select(`
       *,
@@ -44,6 +70,8 @@ export async function POST(request: NextRequest) {
     .lte("start_time", dayEnd)
     .eq("reminder_sent", false);
 
+  const rdvs = (rdvsData ?? []) as ReminderRdv[];
+
   if (error) {
     console.error("Error fetching rdvs:", error);
     return NextResponse.json({ error: "Erreur lors de la récupération des RDVs" }, { status: 500 });
@@ -55,8 +83,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Calculer le nombre de clients réellement notifiables (avec email)
-  // @ts-ignore
-  const clientsToSend = rdvs.filter((r: any) => r.clients && r.clients.email);
+  const clientsToSend = rdvs.filter((rdv) => Boolean(rdv.clients?.email));
   const clientsCount = clientsToSend.length;
   console.log(`RDVs trouvés: ${rdvs.length}. Clients avec email: ${clientsCount}`);
 
@@ -84,8 +111,7 @@ export async function POST(request: NextRequest) {
     if (!client || !client.email) continue;
 
     try {
-      // @ts-ignore - Handle profile being an object or array depending on PostgREST config
-      const assignee = Array.isArray(rdv.profiles) ? rdv.profiles[0] : rdv.profiles;
+      const assignee = getAssignee(rdv.profiles);
 
       // Log avant envoi avec infos client
       console.log(`Envoi rappel RDV ${rdv.id} -> ${client.email} (${client.first_name || ''} ${client.last_name || ''}) prévu ${rdv.start_time}`);
@@ -125,10 +151,15 @@ export async function POST(request: NextRequest) {
       });
 
       // 5. Marquer comme envoyé
-      await supabase
+      const { error: updateError } = await supabase
         .from("rendez_vous")
-        .update({ reminder_sent: true })
+        // Service-role client is intentionally schema-agnostic in this route.
+        .update({ reminder_sent: true } as never)
         .eq("id", rdv.id);
+
+      if (updateError) {
+        console.error(`Unable to mark reminder as sent for RDV ${rdv.id}:`, updateError);
+      }
 
       results.sent++;
       results.details.push({

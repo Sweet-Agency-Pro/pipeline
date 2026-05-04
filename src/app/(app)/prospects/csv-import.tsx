@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useActivityLog } from "@/hooks/use-activity-log";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -262,6 +263,7 @@ function parseCsv(text: string): { rows: CsvRow[]; errors: string[] } {
 export function CsvImport() {
   const router = useRouter();
   const supabase = createClient();
+  const { log, getUserId } = useActivityLog();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -290,9 +292,7 @@ export function CsvImport() {
     if (!preview || preview.length === 0) return;
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const userId = await getUserId();
 
     let success = 0;
     let failed = 0;
@@ -308,8 +308,8 @@ export function CsvImport() {
         estimated_amount: parseFloat(row.estimated_amount || "0") || 0,
         notes: row.notes || null,
         status: row.status || "prospect",
-        created_by: user?.id,
-        assigned_to: user?.id,
+        created_by: userId,
+        assigned_to: userId,
       });
 
       if (error) {
@@ -320,12 +320,8 @@ export function CsvImport() {
     }
 
     // Log activity
-    if (success > 0 && user) {
-      await supabase.from("activity_log").insert({
-        user_id: user.id,
-        action: `Import CSV : ${success} prospect(s) ajouté(s)`,
-        entity_type: "client",
-      });
+    if (success > 0) {
+      await log(`Import CSV : ${success} prospect(s) ajouté(s)`, "client");
     }
 
     setResult({ success, failed });

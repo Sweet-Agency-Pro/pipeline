@@ -7,10 +7,11 @@ import {
   CLIENT_STATUS_CONFIG,
   type Client,
 } from "@/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, displayClientName } from "@/lib/utils";
 import { ClientsFilter } from "./clients-filter";
 import { ResizableTable } from "../prospects/resizable-table";
 import { PlanifierRdvButton } from "@/components/planifier-rdv-button";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -18,12 +19,6 @@ interface PageProps {
   searchParams: Promise<{ status?: string; search?: string; source?: string; sort?: string }>;
 }
 
-function displayName(client: Client): string {
-  if (client.first_name && client.first_name !== "-" && client.first_name.trim()) {
-    return `${client.first_name} ${client.last_name}`;
-  }
-  return client.company || client.last_name;
-}
 
 export default async function ClientsPage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -40,6 +35,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
 
   // Exclude prospects — they have their own page
   query = query.neq("status", "prospect");
+  query = query.neq("status", "perdu");
 
   if (params.status && params.status !== "all") {
     query = query.eq("status", params.status);
@@ -60,20 +56,18 @@ export default async function ClientsPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Clients</h1>
-          <p className="text-slate-400">
-            Gérez vos prospects et clients
-          </p>
-        </div>
-        <Link href="/clients/nouveau">
-          <Button className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 border-0 shadow-lg shadow-teal-500/20">
-            <Plus className="mr-2 h-4 w-4" />
-            Nouveau client
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Clients"
+        description="Gérez vos prospects et clients"
+        actions={(
+          <Link href="/clients/nouveau">
+            <Button className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 border-0 shadow-lg shadow-teal-500/20">
+              <Plus className="mr-2 h-4 w-4" />
+              Nouveau client
+            </Button>
+          </Link>
+        )}
+      />
 
       <ClientsFilter
         currentStatus={params.status}
@@ -115,7 +109,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                       href={`/clients/${client.id}`}
                       className="absolute inset-0 z-0"
                     />
-                    {displayName(client)}
+                    {displayClientName(client)}
                   </td>
                   <td className="px-2 py-3 text-muted-foreground truncate overflow-hidden">
                     {client.company || "—"}
@@ -177,7 +171,7 @@ export default async function ClientsPage({ searchParams }: PageProps) {
                   <td className="px-2 py-3 relative z-10">
                     <PlanifierRdvButton
                       clientId={client.id}
-                      clientLabel={displayName(client)}
+                      clientLabel={displayClientName(client)}
                       variant="ghost"
                       size="sm"
                       className="h-7 px-2 text-xs text-teal-400 hover:text-teal-300 hover:bg-teal-500/10"

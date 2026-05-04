@@ -5,8 +5,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ActivityLog } from "@/types";
-import { formatDate, getInitials } from "@/lib/utils";
+import { getInitials } from "@/lib/utils";
 import { ActivityFilter } from "./activity-filter";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ const ENTITY_TYPE_CONFIG: Record<string, { label: string; color: string; bgColor
   client: { label: "Client", color: "text-cyan-400", bgColor: "bg-cyan-500/15" },
   project: { label: "Projet", color: "text-purple-400", bgColor: "bg-purple-500/15" },
   prospect: { label: "Prospect", color: "text-slate-300", bgColor: "bg-slate-700/60" },
+  rendez_vous: { label: "Rendez-vous", color: "text-teal-400", bgColor: "bg-teal-500/15" },
 };
 
 interface PageProps {
@@ -74,12 +76,10 @@ export default async function ActivityPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">Activité récente</h1>
-        <p className="text-slate-400">
-          Historique de toutes les actions effectuées
-        </p>
-      </div>
+      <PageHeader
+        title="Activité récente"
+        description="Historique de toutes les actions effectuées"
+      />
 
       <ActivityFilter
         currentSearch={params.search}
@@ -110,7 +110,7 @@ export default async function ActivityPage({ searchParams }: PageProps) {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-slate-200 truncate">
-                        {activity.profile?.email ?? "Utilisateur inconnu"}
+                        {activity.profile?.full_name ?? activity.profile?.email ?? "Utilisateur inconnu"}
                       </span>
                       <Badge
                         variant="secondary"

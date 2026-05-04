@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useActivityLog } from "@/hooks/use-activity-log";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -16,7 +16,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -36,33 +35,34 @@ import {
   type ClientStatus,
 } from "@/types";
 import { MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
+import { useSupabaseClient } from "@/hooks/use-supabase-client";
+import {
+  deleteClientRecord,
+  parseClientFormData,
+  updateClientRecord,
+  updateClientStatus,
+} from "@/lib/supabase/client-records";
 
 export function ClientActions({ client }: { client: Client }) {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useSupabaseClient();
+  const { log } = useActivityLog();
   const [editOpen, setEditOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [statusLoading, setStatusLoading] = useState(false);
 
   async function handleStatusChange(newStatus: string) {
     setStatusLoading(true);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
 
-    await supabase
-      .from("clients")
-      .update({ status: newStatus })
-      .eq("id", client.id);
+    await updateClientStatus(supabase, client.id, newStatus as ClientStatus);
 
     const statusLabel =
       CLIENT_STATUS_CONFIG[newStatus as ClientStatus]?.label ?? newStatus;
-    await supabase.from("activity_log").insert({
-      user_id: user?.id,
-      action: `Statut de ${client.first_name} ${client.last_name} changé en "${statusLabel}"`,
-      entity_type: "client",
-      entity_id: client.id,
-    });
+    await log(
+      `Statut de ${client.first_name} ${client.last_name} changé en "${statusLabel}"`,
+      "client",
+      client.id
+    );
 
     setStatusLoading(false);
     router.refresh();
@@ -73,32 +73,18 @@ export function ClientActions({ client }: { client: Client }) {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    const updates = {
-      first_name: formData.get("first_name") as string,
-      last_name: formData.get("last_name") as string,
-      email: (formData.get("email") as string) || null,
-      phone: (formData.get("phone") as string) || null,
-      company: (formData.get("company") as string) || null,
-      source: (formData.get("source") as string) || null,
-      github_url: (formData.get("github_url") as string) || null,
-      estimated_amount:
-        parseFloat(formData.get("estimated_amount") as string) || 0,
-      notes: (formData.get("notes") as string) || null,
-      last_contacted_at: new Date().toISOString(),
-    };
-
-    await supabase.from("clients").update(updates).eq("id", client.id);
-
-    await supabase.from("activity_log").insert({
-      user_id: user?.id,
-      action: `Client ${updates.first_name} ${updates.last_name} modifié`,
-      entity_type: "client",
-      entity_id: client.id,
+    const updates = parseClientFormData(formData, {
+      defaultStatus: client.status,
+      includeLastContactedAt: true,
     });
+
+    await updateClientRecord(supabase, client.id, updates);
+
+    await log(
+      `Client ${updates.first_name} ${updates.last_name} modifié`,
+      "client",
+      client.id
+    );
 
     setLoading(false);
     setEditOpen(false);
@@ -108,18 +94,13 @@ export function ClientActions({ client }: { client: Client }) {
   async function handleDelete() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    await log(
+      `Client ${client.first_name} ${client.last_name} supprimé`,
+      "client",
+      client.id
+    );
 
-    await supabase.from("activity_log").insert({
-      user_id: user?.id,
-      action: `Client ${client.first_name} ${client.last_name} supprimé`,
-      entity_type: "client",
-      entity_id: client.id,
-    });
-
-    await supabase.from("clients").delete().eq("id", client.id);
+    await deleteClientRecord(supabase, client.id);
 
     router.push("/clients");
     router.refresh();

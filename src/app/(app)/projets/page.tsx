@@ -11,6 +11,7 @@ import { Calendar, DollarSign, ExternalLink } from "lucide-react";
 import { PROJECT_STATUS_CONFIG, type Project, type Client, type ProjectStatus } from "@/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ProjectsFilter } from "./projects-filter";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -65,14 +66,10 @@ export default async function ProjectsPage({ searchParams }: PageProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Projets</h1>
-          <p className="text-slate-400">
-            Suivi opérationnel de vos contrats gagnés
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Projets"
+        description="Suivi opérationnel de vos contrats gagnés"
+      />
 
       <ProjectsFilter
         currentSearch={params.search}

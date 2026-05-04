@@ -47,3 +47,31 @@ export function getInitials(name: string | null): string {
     .toUpperCase()
     .slice(0, 2);
 }
+
+/**
+ * Affiche le nom d'un client/prospect de façon intelligente.
+ * Si first_name est vide ou "-", fallback sur company ou last_name.
+ */
+export function displayClientName(client: {
+  first_name: string;
+  last_name: string;
+  company?: string | null;
+}): string {
+  if (client.first_name && client.first_name !== "-" && client.first_name.trim()) {
+    return `${client.first_name} ${client.last_name}`;
+  }
+  return client.company || client.last_name;
+}
+
+/**
+ * Génère un label complet pour un client (nom + entreprise entre parenthèses).
+ * Utilisé par les selects de RDV et les boutons "Planifier".
+ */
+export function getClientLabel(client: {
+  first_name: string;
+  last_name: string;
+  company?: string | null;
+}): string {
+  return `${client.first_name} ${client.last_name}${client.company ? ` (${client.company})` : ""}`;
+}
+

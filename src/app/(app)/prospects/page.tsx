@@ -3,10 +3,12 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Plus, Mail, Phone, UserPlus } from "lucide-react";
 import { type Client } from "@/types";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, displayClientName } from "@/lib/utils";
 import { ProspectsFilter } from "./prospects-filter";
 import { CsvImport } from "./csv-import";
+import { ProspectsPerdusDialog } from "./prospects-perdus-dialog";
 import { ResizableTable } from "./resizable-table";
+import { PageHeader } from "@/components/layout/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +16,7 @@ interface PageProps {
   searchParams: Promise<{ search?: string; source?: string; sort?: string }>;
 }
 
-function displayName(prospect: Client): string {
-  if (prospect.first_name && prospect.first_name !== "-" && prospect.first_name.trim()) {
-    return `${prospect.first_name} ${prospect.last_name}`;
-  }
-  return prospect.company || prospect.last_name;
-}
+
 
 export default async function ProspectsPage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -48,27 +45,33 @@ export default async function ProspectsPage({ searchParams }: PageProps) {
     );
   }
 
-  const { data: prospects } = await query;
+  const [{ data: prospects }, { data: lostProspects }] = await Promise.all([
+    query,
+    supabase
+      .from("clients")
+      .select("*, assigned_profile:profiles!clients_assigned_to_fkey(*)")
+      .eq("status", "perdu")
+      .order("updated_at", { ascending: false }),
+  ]);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Prospects</h1>
-          <p className="text-slate-400">
-            Gérez vos prospects avant conversion en clients
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <CsvImport />
-          <Link href="/prospects/nouveau">
-            <Button className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 border-0 shadow-lg shadow-teal-500/20">
-              <Plus className="mr-2 h-4 w-4" />
-              Nouveau prospect
-            </Button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Prospects"
+        description="Gérez vos prospects avant conversion en clients"
+        actions={(
+          <>
+            <ProspectsPerdusDialog prospects={(lostProspects as Client[]) || []} />
+            <CsvImport />
+            <Link href="/prospects/nouveau">
+              <Button className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 border-0 shadow-lg shadow-teal-500/20">
+                <Plus className="mr-2 h-4 w-4" />
+                Nouveau prospect
+              </Button>
+            </Link>
+          </>
+        )}
+      />
 
       <ProspectsFilter
         currentSearch={params.search}
@@ -106,7 +109,7 @@ export default async function ProspectsPage({ searchParams }: PageProps) {
                       href={`/clients/nouveau?from_prospect=${prospect.id}`}
                       className="absolute inset-0 z-0"
                     />
-                    {displayName(prospect)}
+                    {displayClientName(prospect)}
                   </td>
                   <td className="px-2 py-3 text-muted-foreground truncate overflow-hidden">
                     {prospect.company || "—"}

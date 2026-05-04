@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useActivityLog } from "@/hooks/use-activity-log";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const supabase = createClient();
+  const { log } = useActivityLog();
 
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
@@ -88,15 +90,11 @@ export default function ProjectDetailPage() {
 
     if (!error) {
       setProject({ ...project, status: newStatus });
-
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("activity_log").insert({
-        user_id: user?.id,
-        action: `Statut du projet "${project.name}" mis à jour : ${PROJECT_STATUS_CONFIG[newStatus].label}`,
-        entity_type: "project",
-        entity_id: project.id,
-      });
-
+      await log(
+        `Statut du projet "${project.name}" mis à jour : ${PROJECT_STATUS_CONFIG[newStatus].label}`,
+        "project",
+        project.id
+      );
       router.refresh();
     }
     setUpdating(false);
@@ -115,15 +113,11 @@ export default function ProjectDetailPage() {
 
     if (!error) {
       setProject({ ...project, deadline: dateStr });
-
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("activity_log").insert({
-        user_id: user?.id,
-        action: `Deadline du projet "${project.name}" mise à jour : ${dateStr ? formatDate(dateStr) : 'Supprimée'}`,
-        entity_type: "project",
-        entity_id: project.id,
-      });
-
+      await log(
+        `Deadline du projet "${project.name}" mise à jour : ${dateStr ? formatDate(dateStr) : 'Supprimée'}`,
+        "project",
+        project.id
+      );
       router.refresh();
     }
     setUpdating(false);
@@ -139,13 +133,7 @@ export default function ProjectDetailPage() {
       .eq("id", project.id);
 
     if (!error) {
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("activity_log").insert({
-        user_id: user?.id,
-        action: `Projet supprimé : ${project.name}`,
-        entity_type: "project",
-        entity_id: null,
-      });
+      await log(`Projet supprimé : ${project.name}`, "project");
 
       router.push("/projets");
       router.refresh();
@@ -177,11 +165,14 @@ export default function ProjectDetailPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
-          <Link href="/projets">
-            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-700">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-slate-400 hover:text-white hover:bg-slate-700"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-3xl font-bold tracking-tight text-white">

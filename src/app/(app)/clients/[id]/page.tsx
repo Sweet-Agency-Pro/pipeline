@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import Link from "next/link";
+import { useActivityLog } from "@/hooks/use-activity-log";
+import { autoCreateProjectIfWon } from "@/lib/supabase/mutations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,22 +29,28 @@ import {
 } from "@/types";
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { PlanifierRdvButton } from "@/components/planifier-rdv-button";
+import { getClientLabel } from "@/lib/utils";
+import { useSupabaseClient } from "@/hooks/use-supabase-client";
+import {
+  deleteClientRecord,
+  fetchClientById,
+  parseClientFormData,
+  updateClientRecord,
+} from "@/lib/supabase/client-records";
 
 export default function ClientEditPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const supabase = createClient();
+  const supabase = useSupabaseClient();
+  const { log, getUserId } = useActivityLog();
   const [loading, setLoading] = useState(false);
   const [client, setClient] = useState<Client | null>(null);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("id", params.id)
-        .single();
+      const { data } = await fetchClientById(supabase, params.id);
+
       if (data) {
         setClient(data);
       } else {
@@ -59,60 +65,34 @@ export default function ClientEditPage() {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const updates = parseClientFormData(formData, {
+      defaultStatus: client?.status ?? "prospect",
+    });
 
-    const updates = {
-      first_name: formData.get("first_name") as string,
-      last_name: formData.get("last_name") as string,
-      email: (formData.get("email") as string) || null,
-      phone: (formData.get("phone") as string) || null,
-      company: (formData.get("company") as string) || null,
-      status: formData.get("status") as ClientStatus,
-      source: (formData.get("source") as string) || null,
-      github_url: (formData.get("github_url") as string) || null,
-      estimated_amount: parseFloat(formData.get("estimated_amount") as string) || 0,
-      notes: (formData.get("notes") as string) || null,
-    };
-
-    const { error } = await supabase
-      .from("clients")
-      .update(updates)
-      .eq("id", params.id);
+    const { error } = await updateClientRecord(supabase, params.id, updates);
 
     if (!error) {
       const isWon = updates.status === "gagne";
 
-      await supabase.from("activity_log").insert({
-        user_id: user?.id,
-        action: isWon 
+      await log(
+        isWon
           ? `Client ${updates.first_name} ${updates.last_name} gagné ! 🎉`
           : `Client ${updates.first_name} ${updates.last_name} modifié`,
-        entity_type: "client",
-        entity_id: params.id,
-      });
+        "client",
+        params.id
+      );
 
-      // Automatiquement créer un projet si le statut est "Gagné"
       if (isWon) {
-        // Vérifier si un projet n'existe pas déjà pour ce client
-        const { data: existingProject } = await supabase
-          .from("projects")
-          .select("id")
-          .eq("client_id", params.id)
-          .maybeSingle();
-
-        if (!existingProject) {
-          await supabase.from("projects").insert({
-            name: `Projet - ${updates.company || updates.last_name}`,
-            client_id: params.id,
-            status: "en_attente",
-            budget: updates.estimated_amount,
-            github_url: updates.github_url,
-            created_by: user?.id,
-            description: updates.notes
-          });
-        }
+        const userId = await getUserId();
+        await autoCreateProjectIfWon(supabase, {
+          clientId: params.id,
+          company: updates.company,
+          lastName: updates.last_name,
+          estimatedAmount: updates.estimated_amount,
+          githubUrl: updates.github_url,
+          notes: updates.notes,
+          userId,
+        });
       }
 
       router.push("/clients");
@@ -126,18 +106,13 @@ export default function ClientEditPage() {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce client ?")) return;
     setLoading(true);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    await log(
+      `Client ${client?.first_name} ${client?.last_name} supprimé`,
+      "client",
+      params.id
+    );
 
-    await supabase.from("activity_log").insert({
-      user_id: user?.id,
-      action: `Client ${client?.first_name} ${client?.last_name} supprimé`,
-      entity_type: "client",
-      entity_id: params.id,
-    });
-
-    await supabase.from("clients").delete().eq("id", params.id);
+    await deleteClientRecord(supabase, params.id);
 
     router.push("/clients");
     router.refresh();
@@ -162,11 +137,14 @@ export default function ClientEditPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/clients">
-          <Button variant="ghost" size="icon" className="text-slate-400 hover:text-white hover:bg-slate-700">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-        </Link>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-slate-400 hover:text-white hover:bg-slate-700"
+          onClick={() => router.back()}
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div className="flex-1">
           <h1 className="text-3xl font-bold tracking-tight text-white">
             Modifier le client
@@ -177,7 +155,7 @@ export default function ClientEditPage() {
         </div>
         <PlanifierRdvButton
           clientId={client.id}
-          clientLabel={`${client.first_name} ${client.last_name}${client.company ? ` (${client.company})` : ""}`}
+          clientLabel={getClientLabel(client)}
           className="border-teal-500/30 text-teal-400 hover:bg-teal-500/10 hover:text-teal-300"
         />
         <Button
@@ -328,11 +306,14 @@ export default function ClientEditPage() {
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Enregistrer
               </Button>
-              <Link href="/clients">
-                <Button variant="outline" type="button" className="border-slate-700 text-slate-300 hover:bg-slate-700">
-                  Annuler
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                type="button"
+                className="border-slate-700 text-slate-300 hover:bg-slate-700"
+                onClick={() => router.back()}
+              >
+                Annuler
+              </Button>
             </div>
           </form>
         </CardContent>

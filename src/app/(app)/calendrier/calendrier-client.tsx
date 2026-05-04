@@ -40,6 +40,7 @@ import { fr } from "date-fns/locale";
 import type { Profile, RendezVous, GoogleCalendarEvent, RdvStatus } from "@/types";
 import { RDV_STATUS_CONFIG } from "@/types";
 import { cn } from "@/lib/utils";
+import { useActivityLog } from "@/hooks/use-activity-log";
 import { NouveauRdvDialog } from "./nouveau-rdv-dialog";
 import { RdvDetailDialog } from "./rdv-detail-dialog";
 
@@ -193,6 +194,7 @@ const getCalendarLabel = (id: string) => {
 
 export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierClientProps) {
   const supabase = createClient();
+  const { log } = useActivityLog();
   const gridRef = useRef<HTMLDivElement>(null);
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -507,7 +509,10 @@ export function CalendrierClient({ profiles, clients, calendarIds }: CalendrierC
                                   body: JSON.stringify({ title: rdv.title, start: rdv.start_time }),
                                 });
                               } catch { }
-                              await supabase.from("rendez_vous").delete().eq("id", rdv.id);
+                              const { error } = await supabase.from("rendez_vous").delete().eq("id", rdv.id);
+                              if (!error) {
+                                await log(`a supprimé le rendez-vous "${rdv.title}"`, "rendez_vous", rdv.id);
+                              }
                               loadRdvs();
                               loadUpcomingRdvs();
                             }}

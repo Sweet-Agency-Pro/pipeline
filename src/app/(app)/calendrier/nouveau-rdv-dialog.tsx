@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   Dialog,
@@ -17,6 +17,7 @@ import { format, addHours, addMinutes, addDays, startOfDay, endOfDay, parseISO, 
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
+import { useActivityLog } from "@/hooks/use-activity-log";
 import {
   Popover,
   PopoverContent,
@@ -64,17 +65,12 @@ const inputClass =
 function DateTimePicker({ value, onChange, label, className }: { value: string, onChange: (v: string) => void, label: string, className?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const uid = useId();
   const [isOpen, setIsOpen] = useState(false);
 
   const dateObj = useMemo(() => {
     const d = new Date(value);
     return isNaN(d.getTime()) ? new Date() : d;
-  }, [value]);
-
-  const [tempTime, setTempTime] = useState(format(dateObj, "HH:mm"));
-
-  useEffect(() => {
-    setTempTime(format(dateObj, "HH:mm"));
   }, [value]);
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -153,16 +149,17 @@ function DateTimePicker({ value, onChange, label, className }: { value: string, 
               onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
-              <Clock className="h-3.5 w-3.5 text-teal-500/70" />
+              <Clock className="h-3.5 w-3.5 text-teal-500/70 shrink-0" />
               <input
                 ref={inputRef}
+                key={value}
                 type="search"
-                name={`time_${Math.random().toString(36).slice(2, 7)}`}
-                id={`time_${Math.random().toString(36).slice(2, 7)}`}
+                name={`time_${uid}`}
+                id={`time_${uid}`}
                 autoComplete="off"
                 data-lpignore="true"
                 data-1p-ignore
-                value={tempTime}
+                defaultValue={format(dateObj, "HH:mm")}
                 onFocus={(e) => {
                   setIsOpen(true);
                   e.currentTarget.select();
@@ -176,7 +173,7 @@ function DateTimePicker({ value, onChange, label, className }: { value: string, 
                 }}
                 onChange={(e) => {
                   const val = e.target.value.replace(/[^0-9:]/g, "");
-                  setTempTime(val);
+                  e.currentTarget.value = val;
                   if (/^([01]\d|2[0-3]):[0-5]\d$/.test(val)) {
                     const [h, m] = val.split(":").map(Number);
                     const next = new Date(dateObj);
@@ -185,13 +182,15 @@ function DateTimePicker({ value, onChange, label, className }: { value: string, 
                     onChange(format(next, "yyyy-MM-dd'T'HH:mm"));
                   }
                 }}
-                onBlur={() => setTempTime(format(dateObj, "HH:mm"))}
+                onBlur={(e) => {
+                  e.currentTarget.value = format(dateObj, "HH:mm");
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.currentTarget.blur();
                   }
                 }}
-                className="bg-transparent border-none p-0 tabular-nums font-bold text-teal-400 text-sm w-12 focus:ring-0 focus:outline-none placeholder:text-teal-900 cursor-text [appearance:none] [&::-webkit-search-cancel-button]:hidden"
+                className="bg-transparent border-none p-0 tabular-nums font-bold text-teal-400 text-sm w-[52px] focus:ring-0 focus:outline-none placeholder:text-teal-900 cursor-text [appearance:none] [&::-webkit-search-cancel-button]:hidden"
                 placeholder="00:00"
               />
             </div>
@@ -258,6 +257,8 @@ export function NouveauRdvDialog({
   initialRdv,
 }: NouveauRdvDialogProps) {
   const supabase = createClient();
+  const { log } = useActivityLog();
+  const clientInputId = useId();
   const [loading, setLoading] = useState(false);
   const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([]);
   const [rdvs, setRdvs] = useState<RendezVous[]>([]);
@@ -356,7 +357,9 @@ export function NouveauRdvDialog({
   }, [profiles, calendarIds]);
 
   useEffect(() => {
-    if (open && validUsers.length > 0) {
+    if (!(open && validUsers.length > 0)) return;
+
+    queueMicrotask(() => {
       if (initialRdv) {
         setForm({
           title: initialRdv.title,
@@ -387,14 +390,16 @@ export function NouveauRdvDialog({
       }
       setClientEmail("");
       setClientHasEmail(true);
-    }
+    });
   }, [open, validUsers, defaultClientId, initialRdv]);
 
   // Fetch client email when client changes
   useEffect(() => {
     if (!form.client_id) {
-      setClientEmail("");
-      setClientHasEmail(true);
+      queueMicrotask(() => {
+        setClientEmail("");
+        setClientHasEmail(true);
+      });
       return;
     }
     supabase
@@ -417,7 +422,11 @@ export function NouveauRdvDialog({
   useEffect(() => {
     if (form.start_time) {
       const d = new Date(form.start_time);
-      if (!isNaN(d.getTime())) setPreviewDate(d);
+      if (!isNaN(d.getTime())) {
+        queueMicrotask(() => {
+          setPreviewDate(d);
+        });
+      }
     }
   }, [form.start_time]);
 
@@ -444,7 +453,11 @@ export function NouveauRdvDialog({
   }, [previewDate, supabase]);
 
   useEffect(() => {
-    if (open) loadPreviewEvents();
+    if (!open) return;
+
+    queueMicrotask(() => {
+      void loadPreviewEvents();
+    });
   }, [open, loadPreviewEvents]);
 
   // Color map
@@ -503,6 +516,7 @@ export function NouveauRdvDialog({
 
     const startISO = new Date(form.start_time).toISOString();
     const endISO = new Date(form.end_time).toISOString();
+    const clientLabel = selectedClient?.label;
 
     let error = null;
     let savedRdvId: string | null = initialRdv?.id || null;
@@ -549,6 +563,14 @@ export function NouveauRdvDialog({
         } catch (err) {
           console.error("GCal edit sync failed:", err);
         }
+      }
+
+      if (!error) {
+        await log(
+          `a modifié le rendez-vous "${form.title}"${clientLabel ? ` pour ${clientLabel}` : ""}`,
+          "rendez_vous",
+          initialRdv.id
+        );
       }
     } else {
       const { data: insertedRdv, error: err } = await supabase
@@ -603,6 +625,14 @@ export function NouveauRdvDialog({
             .update({ google_event_id: savedEventId, google_calendar_id: savedCalId })
             .eq("id", savedRdvId);
         }
+      }
+
+      if (!error && savedRdvId) {
+        await log(
+          `a créé le rendez-vous "${form.title}"${clientLabel ? ` pour ${clientLabel}` : ""}`,
+          "rendez_vous",
+          savedRdvId
+        );
       }
     }
 
@@ -701,18 +731,18 @@ export function NouveauRdvDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="bg-slate-900 border-slate-700/60 text-slate-200 sm:max-w-4xl p-0 gap-0 overflow-hidden">
+      <DialogContent className="bg-slate-900 border-slate-700/60 text-slate-200 sm:max-w-3xl p-0 gap-0 overflow-hidden max-h-[90vh] flex flex-col">
         <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle className="text-lg font-semibold text-white">
             {initialRdv ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex min-h-0">
+        <div className="flex min-h-0 w-full flex-1 overflow-hidden">
           {/* ── Left: Form ── */}
-          <form onSubmit={handleSubmit} className="flex-1 px-6 pb-6 space-y-4 overflow-y-auto max-h-[70vh]">
+          <form onSubmit={handleSubmit} className="flex-1 min-w-0 px-6 pb-6 space-y-4 overflow-y-auto">
             {/* Titre */}
-            <div>
+            <div className="min-w-0">
               <Label className="text-xs font-medium text-slate-400">Titre *</Label>
               <Input
                 required
@@ -838,7 +868,7 @@ export function NouveauRdvDialog({
               {/* Lieu (Stylisé) */}
               <div className="space-y-3 min-w-0 flex flex-col">
                 <Label className="text-xs font-medium text-slate-400">Lien ou lieu du rendez-vous</Label>
-                <div className="relative group flex items-center">
+                <div className="relative group flex items-center min-w-0 w-full">
                   <div className="absolute left-1.5 h-8 w-8 rounded-lg bg-slate-800/80 flex items-center justify-center border border-slate-700/50 shadow-sm transition-colors group-focus-within:border-teal-500/30 group-focus-within:text-teal-400 text-slate-400 z-10 pointer-events-none">
                     {form.location?.startsWith("http") ? <Video className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
                   </div>
@@ -879,7 +909,7 @@ export function NouveauRdvDialog({
             </div>
 
             {/* Client (Recherche interactive) */}
-            <div className="relative space-y-1.5">
+            <div className="relative space-y-1.5 min-w-0">
               <Label className="text-xs font-medium text-slate-400">Client</Label>
 
               {!form.client_id ? (
@@ -887,8 +917,8 @@ export function NouveauRdvDialog({
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
                   <Input
                     type="search"
-                    name={`client_${Math.random().toString(36).slice(2, 7)}`}
-                    id={`client_${Math.random().toString(36).slice(2, 7)}`}
+                    name={`client_${clientInputId}`}
+                    id={`client_${clientInputId}`}
                     placeholder="Chercher par nom, email ou société..."
                     autoComplete="off"
                     data-lpignore="true"
@@ -954,7 +984,7 @@ export function NouveauRdvDialog({
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-3 p-3 bg-teal-500/10 border border-teal-500/30 rounded-xl group transition-all hover:bg-teal-500/15">
+                <div className="flex items-center gap-3 p-3 bg-teal-500/10 border border-teal-500/30 rounded-xl group transition-all hover:bg-teal-500/15 overflow-hidden">
                   <div className="h-10 w-10 rounded-full bg-teal-500/20 flex items-center justify-center shrink-0">
                     <span className="text-teal-400 font-bold">
                       {selectedClient?.label.charAt(0).toUpperCase()}
@@ -967,7 +997,7 @@ export function NouveauRdvDialog({
                   <button
                     type="button"
                     onClick={() => update("client_id", "")}
-                    className="p-2 hover:bg-teal-500/20 rounded-lg text-teal-500 transition-colors"
+                    className="p-2 hover:bg-teal-500/20 rounded-lg text-teal-500 transition-colors shrink-0"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -1035,7 +1065,7 @@ export function NouveauRdvDialog({
           </form>
 
           {/* ── Right: Day Preview ── */}
-          <div className="w-[300px] shrink-0 flex flex-col min-h-0 bg-slate-950/20 p-6 space-y-4">
+          <div className="hidden md:flex w-[300px] shrink-0 flex-col min-h-0 bg-slate-950/20 p-6 space-y-4">
             <div className="flex flex-col flex-1 min-h-0 bg-slate-900/50 rounded-2xl border border-slate-700/50 shadow-inner overflow-hidden">
               {/* Day nav */}
               <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700/60 shrink-0 bg-slate-950/40">

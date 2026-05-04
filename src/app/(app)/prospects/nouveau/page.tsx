@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useActivityLog } from "@/hooks/use-activity-log";
+import { useRdvFormData } from "@/hooks/use-rdv-form-data";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,84 +21,55 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CLIENT_SOURCES, type Profile } from "@/types";
+import { CLIENT_SOURCES } from "@/types";
 import { ArrowLeft, Loader2, CalendarPlus } from "lucide-react";
 import Link from "next/link";
 import { NouveauRdvDialog } from "@/app/(app)/calendrier/nouveau-rdv-dialog";
+import { getClientLabel } from "@/lib/utils";
+import { useSupabaseClient } from "@/hooks/use-supabase-client";
+import {
+  createClientRecord,
+  parseClientFormData,
+} from "@/lib/supabase/client-records";
 
 export default function NewProspectPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useSupabaseClient();
+  const { log, getUserId } = useActivityLog();
+  const rdvData = useRdvFormData();
   const [loading, setLoading] = useState(false);
 
   // RDV dialog after creation
   const wantsRdv = useRef(false);
   const [savedClient, setSavedClient] = useState<{ id: string; label: string } | null>(null);
   const [rdvDialogOpen, setRdvDialogOpen] = useState(false);
-  const [rdvProfiles, setRdvProfiles] = useState<Profile[]>([]);
-  const [rdvClients, setRdvClients] = useState<{ id: string; label: string }[]>([]);
-  const [rdvCalendarIds, setRdvCalendarIds] = useState<string[]>([]);
-  const rdvDataLoaded = useRef(false);
-
-  const loadRdvData = useCallback(async () => {
-    if (rdvDataLoaded.current) return;
-    const [profilesRes, clientsRes, configRes] = await Promise.all([
-      supabase.from("profiles").select("*").order("full_name"),
-      supabase.from("clients").select("id, first_name, last_name, company").neq("status", "perdu").order("last_name"),
-      fetch("/api/calendar/config").then((r) => r.json()),
-    ]);
-    setRdvProfiles((profilesRes.data as Profile[]) || []);
-    setRdvClients(
-      clientsRes.data?.map((c: { id: string; first_name: string; last_name: string; company?: string }) => ({
-        id: c.id,
-        label: `${c.first_name} ${c.last_name}${c.company ? ` (${c.company})` : ""}`,
-      })) || []
-    );
-    setRdvCalendarIds(configRes.calendarIds || []);
-    rdvDataLoaded.current = true;
-  }, [supabase]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const userId = await getUserId();
 
-    const prospectData = {
-      first_name: formData.get("first_name") as string,
-      last_name: formData.get("last_name") as string,
-      email: (formData.get("email") as string) || null,
-      phone: (formData.get("phone") as string) || null,
-      company: (formData.get("company") as string) || null,
-      source: (formData.get("source") as string) || null,
-      estimated_amount: parseFloat(formData.get("estimated_amount") as string) || 0,
-      notes: (formData.get("notes") as string) || null,
-      status: "prospect" as const,
-      created_by: user?.id,
-      assigned_to: user?.id,
-    };
+    const prospectData = parseClientFormData(formData, {
+      defaultStatus: "prospect",
+    });
 
-    const { data, error } = await supabase
-      .from("clients")
-      .insert(prospectData)
-      .select()
-      .single();
+    const { data, error } = await createClientRecord(supabase, prospectData, {
+      createdBy: userId,
+      assignedTo: userId,
+    });
 
     if (!error && data) {
-      await supabase.from("activity_log").insert({
-        user_id: user?.id,
-        action: `Nouveau prospect ajouté : ${prospectData.first_name} ${prospectData.last_name}`,
-        entity_type: "client",
-        entity_id: data.id,
-      });
+      await log(
+        `Nouveau prospect ajouté : ${prospectData.first_name} ${prospectData.last_name}`,
+        "client",
+        data.id
+      );
 
       if (wantsRdv.current) {
-        const label = `${prospectData.first_name} ${prospectData.last_name}${prospectData.company ? ` (${prospectData.company})` : ""}`;
-        setSavedClient({ id: data.id, label });
-        await loadRdvData();
+        setSavedClient({ id: data.id, label: getClientLabel(prospectData) });
+        await rdvData.load();
         setRdvDialogOpen(true);
         setLoading(false);
         wantsRdv.current = false;
@@ -245,7 +217,7 @@ export default function NewProspectPage() {
         </CardContent>
       </Card>
 
-      {savedClient && rdvDataLoaded.current && (
+      {savedClient && rdvData.loaded && (
         <NouveauRdvDialog
           open={rdvDialogOpen}
           onClose={() => {
@@ -258,9 +230,9 @@ export default function NewProspectPage() {
             router.push("/prospects");
             router.refresh();
           }}
-          profiles={rdvProfiles}
-          clients={rdvClients}
-          calendarIds={rdvCalendarIds}
+          profiles={rdvData.profiles}
+          clients={rdvData.clients}
+          calendarIds={rdvData.calendarIds}
           defaultClientId={savedClient.id}
         />
       )}

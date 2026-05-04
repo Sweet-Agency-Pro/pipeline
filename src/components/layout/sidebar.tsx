@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -24,16 +23,19 @@ import {
   LogOut,
   Menu,
   X,
+  CalendarClock,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Profile } from "@/types";
 import { getInitials } from "@/lib/utils";
+import { useSupabaseClient } from "@/hooks/use-supabase-client";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Prospects", href: "/prospects", icon: UserSearch },
   { name: "Clients", href: "/clients", icon: Users },
   { name: "Projets", href: "/projets", icon: FolderKanban },
+  { name: "Rendez-vous", href: "/rendez-vous", icon: CalendarClock },
   { name: "Calendrier", href: "/calendrier", icon: CalendarDays },
   { name: "Activité", href: "/activite", icon: Activity },
 ];
@@ -41,7 +43,7 @@ const navigation = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useSupabaseClient();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -68,7 +70,7 @@ export function Sidebar() {
     router.refresh();
   }
 
-  const NavLinks = () => (
+  const renderNavLinks = () => (
     <nav className="flex-1 space-y-1 px-3 py-4">
       {navigation.map((item) => {
         const isActive =
@@ -93,7 +95,7 @@ export function Sidebar() {
     </nav>
   );
 
-  const UserSection = () => (
+  const renderUserSection = () => (
     <div className="border-t border-slate-700 p-3">
       <DropdownMenu>
         <DropdownMenuTrigger>
@@ -166,8 +168,8 @@ export function Sidebar() {
           </Link>
         </div>
 
-        <NavLinks />
-        <UserSection />
+        {renderNavLinks()}
+        {renderUserSection()}
       </aside>
     </>
   );

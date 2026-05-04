@@ -1,6 +1,5 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -11,8 +10,11 @@ import {
 } from "@/components/ui/select";
 import { PROJECT_STATUS_CONFIG, type ProjectStatus } from "@/types";
 import { Search, Filter } from "lucide-react";
-import { useCallback } from "react";
-import { useDebouncedCallback } from "use-debounce";
+import {
+  useDebouncedSearchFilter,
+  useQueryFilters,
+} from "@/hooks/use-query-filters";
+import { PROJECT_SORT_OPTIONS } from "@/lib/filter-options";
 
 interface ProjectsFilterProps {
   currentStatus?: string | null;
@@ -25,26 +27,12 @@ export function ProjectsFilter({
   currentSearch,
   currentSort,
 }: ProjectsFilterProps) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
-  const createQueryString = useCallback(
-    (name: string, value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value && value !== "all") {
-        params.set(name, value);
-      } else {
-        params.delete(name);
-      }
-      return params.toString();
-    },
-    [searchParams]
-  );
-
-  const handleSearch = useDebouncedCallback((term: string) => {
-    router.push(`${pathname || ""}?${createQueryString("search", term)}`);
-  }, 300);
+  const { updateFilter } = useQueryFilters({ defaultPath: "/projets" });
+  const { inputKey, defaultValue, handleSearchChange } = useDebouncedSearchFilter({
+    currentValue: currentSearch,
+    onChange: (value) => updateFilter("search", value, { allValue: "" }),
+    delay: 300,
+  });
 
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -52,19 +40,18 @@ export function ProjectsFilter({
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <Input
+            key={inputKey}
             placeholder="Rechercher un projet, client..."
             className="pl-9 bg-slate-800/50 border-slate-700 text-slate-200"
-            defaultValue={currentSearch || ""}
-            onChange={(e) => handleSearch(e.target.value)}
+            defaultValue={defaultValue}
+            onChange={(e) => handleSearchChange(e.target.value)}
           />
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Select
             value={currentStatus || "all"}
-            onValueChange={(value) =>
-              router.push(`${pathname || ""}?${createQueryString("status", value || "all")}`)
-            }
+            onValueChange={(value) => updateFilter("status", value || "all")}
           >
             <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200 focus:ring-1 focus:ring-slate-500 gap-3">
               <SelectValue>
@@ -84,29 +71,22 @@ export function ProjectsFilter({
 
           <Select
             value={currentSort || "created_at:desc"}
-            onValueChange={(value) =>
-              router.push(`${pathname || ""}?${createQueryString("sort", value || "created_at:desc")}`)
-            }
+            onValueChange={(value) => updateFilter("sort", value || "created_at:desc")}
           >
             <SelectTrigger className="w-full sm:w-fit min-w-[180px] bg-slate-800/50 border-slate-700 text-slate-200 focus:ring-1 focus:ring-slate-500 gap-3">
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 opacity-50 text-slate-400" />
                 <SelectValue>
-                  {currentSort === "created_at:desc" || !currentSort ? "Plus récents" : 
-                   currentSort === "created_at:asc" ? "Plus anciens" :
-                   currentSort === "budget:desc" ? "Plus gros budget" :
-                   currentSort === "budget:asc" ? "Budget croissant" :
-                   currentSort === "name:asc" ? "Nom (A-Z)" :
-                   currentSort === "deadline:asc" ? "Échéance proche" : "Plus récents"}
+                  {PROJECT_SORT_OPTIONS.find((opt) => opt.value === (currentSort || "created_at:desc"))?.label || "Plus récents"}
                 </SelectValue>
               </div>
             </SelectTrigger>
             <SelectContent className="bg-slate-900 border-slate-700 text-slate-200 [&>*]:py-1.5">
-              <SelectItem value="created_at:desc">Plus récents</SelectItem>
-              <SelectItem value="created_at:asc">Plus anciens</SelectItem>
-              <SelectItem value="budget:desc">Plus gros budget</SelectItem>
-              <SelectItem value="name:asc">Nom (A-Z)</SelectItem>
-              <SelectItem value="deadline:asc">Échéance proche</SelectItem>
+              {PROJECT_SORT_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

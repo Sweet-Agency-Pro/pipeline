@@ -236,3 +236,45 @@ export const RDV_STATUS_CONFIG: Record<
     bgColor: "bg-slate-500/15",
   },
 };
+
+// ── Meeting (retour RDV) ──
+
+export type TodoPriority = "high" | "normal" | "low";
+export type TodoCategory = "contenu" | "design" | "services" | "technique" | "commercial";
+export type NextStepChannel = "mail" | "téléphone" | "réunion" | "autre";
+
+export interface TodoItem {
+  action: string;
+  category: TodoCategory;
+  priority: TodoPriority;
+  responsible?: string;
+}
+
+export interface NextStep {
+  action: string;
+  responsible: string;
+  channel: NextStepChannel;
+}
+
+export interface MeetingSummary {
+  context: string;
+  overall_feeling: string;
+  validated_points: string[];
+  pain_points: string[];
+  clarified_expectations: string[];
+}
+
+export type MeetingStatus = "pending" | "uploaded" | "transcribed" | "analyzed";
+
+export interface Meeting {
+  id: string;
+  rdv_id: string;
+  file_path: string | null;
+  status: MeetingStatus;
+  transcription: string | null;
+  summary: MeetingSummary | null;
+  todo_list: TodoItem[] | null;
+  presented_elements: string[] | null;
+  next_steps: NextStep[] | null;
+  created_at: string;
+}
